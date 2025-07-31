@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NotionLinks</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- 顶部标题栏 -->
+    <header class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <div class="logo">
+                    <i class="fas fa-bookmark"></i>
+                    <span>NotionLinks</span>
+                </div>
+            </div>
+            
+            <div class="header-center">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="搜索书签...">
+                    <button class="search-clear" id="searchClear" style="display: none;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="header-right">
+                <button class="sync-btn" id="syncBtn" title="刷新数据">
+                    <i class="fas fa-sync-alt"></i>
+                    <span class="sync-text">刷新</span>
+                </button>
+                <button class="menu-toggle" id="menuToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- 移动端侧边栏遮罩 -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+        
+        <!-- 左侧菜单 -->
+        <aside class="sidebar" id="sidebar">
+            <nav class="nav-menu">
+                <div class="menu-section">
+                    <h3>📂 分类</h3>
+                    <ul class="menu-list" id="categoryMenu">
+                        <li class="menu-item active" data-category="all">
+                            <i class="fas fa-home"></i>
+                            <span>全部</span>
+                            <span class="item-count">0</span>
+                        </li>
+                        
+                        <!-- 动态生成的分类将在这里显示 -->
+                    </ul>
+                </div>
+                
+                <div class="menu-section">
+                    <h3>🏷️ 标签</h3>
+                    <ul class="menu-list" id="tagMenu">
+                        <!-- 动态生成标签 -->
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- 主内容区域 -->
+        <main class="main-content">
+            <div class="content-header">
+                <h1 id="pageTitle">全部书签</h1>
+                <div class="content-stats">
+                    <span class="results-count" id="resultsCount">0 个书签</span>
+                </div>
+            </div>
+
+            <div class="bookmarks-grid" id="bookmarksGrid">
+                <!-- 书签卡片将在这里动态生成 -->
+                <div class="loading" id="loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>正在加载数据...</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 底部信息 -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-copyright">
+                <span>© 2025 <span id="footerSiteName">NotionLinks</span> - Powered by <a href="https://github.com/ipaler/NotionLinks" target="_blank" class="footer-link">NotionLinks</a></span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 返回顶部按钮 -->
+    <button class="back-to-top" id="backToTop">
+        <i class="fas fa-chevron-up"></i>
+    </button>
+
+    <!-- 书签详情模态框 -->
+    <div class="modal" id="bookmarkModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">书签详情</h2>
+                <button class="modal-close" id="modalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- 详情内容 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript 模块 -->
+    <script src="js/lazy-loader.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/events.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

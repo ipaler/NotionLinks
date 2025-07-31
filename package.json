@@ -1,0 +1,45 @@
+{
+  "name": "NotionLinks",
+  "version": "1.0.0",
+  "description": "基于 Notion API 的个人书签管理系统",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "setup": "npm install && npm run setup-env",
+    "setup-env": "node -e \"const fs = require('fs'); if (!fs.existsSync('.env')) { fs.copyFileSync('.env.example', '.env'); console.log('✅ .env 文件已创建，请填入你的 Notion API 配置'); } else { console.log('⚠️  .env 文件已存在'); }\"",
+    "build": "echo '构建完成'",
+    "test": "echo '暂无测试'"
+  },
+  "keywords": [
+    "notion",
+    "bookmark",
+    "manager",
+    "api",
+    "nodejs",
+    "express"
+  ],
+  "author": "ipaler",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ipaler/NotionLinks.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nipaler/NotionLinks/issues"
+  },
+  "homepage": "https://github.com/ipaler/NotionLinks#readme"
+}
