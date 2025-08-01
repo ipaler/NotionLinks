@@ -62,7 +62,7 @@ npm run setup
 5. 复制生成的 "Internal Integration Token"
 
 #### 复制模板数据库
-1. 访问 Notion 模板：https://kpink.notion.site/NotionLinks-24105db5d62a80858c38eaef1097138a
+1. 访问 Notion 模板：https://kpify.notion.site/242619361f5281ffa473f080438627e0
 2. 点击右上角的 "复制" 按钮，将模板复制到你的工作区
 3. 将复制后的数据库与你的集成共享
 4. 复制数据库页面的 URL，提取其中的 32 位 ID

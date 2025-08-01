@@ -184,6 +184,35 @@ class EventManager {
 
     // 处理书签点击
     handleBookmarkClick(e) {
+        // 检查是否点击了快速访问按钮
+        if (e.target.closest('.bookmark-quick-access')) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const button = e.target.closest('.bookmark-quick-access');
+            const url = button.dataset.url;
+            
+            if (url) {
+                // 添加点击反馈
+                button.style.transform = 'scale(0.9)';
+                button.style.background = 'rgba(46, 170, 220, 0.8)';
+                
+                setTimeout(() => {
+                    button.style.transform = '';
+                    button.style.background = '';
+                }, 150);
+                
+                // 在新标签页打开链接
+                window.open(url, '_blank');
+                
+                // 显示成功消息
+                this.uiManager.showMessage('正在打开链接...', 'success');
+            } else {
+                this.uiManager.showMessage('链接地址无效', 'error');
+            }
+            return;
+        }
+        
         // 检查是否点击了链接
         if (e.target.tagName === 'A') {
             return; // 让链接正常跳转
@@ -260,6 +289,56 @@ class EventManager {
         if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
             e.preventDefault();
             this.handleSyncData();
+        }
+        
+        // Enter 键快速访问当前选中的书签
+        if (e.key === 'Enter' && document.activeElement.classList.contains('bookmark-card')) {
+            e.preventDefault();
+            const card = document.activeElement;
+            const bookmark = this.dataManager.findBookmarkById(card.dataset.id);
+            if (bookmark && bookmark.url) {
+                window.open(bookmark.url, '_blank');
+                this.uiManager.showMessage('正在打开链接...', 'success');
+            }
+        }
+        
+        // 方向键导航书签卡片
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+            const currentCard = document.activeElement.closest('.bookmark-card');
+            if (currentCard) {
+                e.preventDefault();
+                this.navigateBookmarks(e.key, currentCard);
+            }
+        }
+    }
+    
+    // 书签卡片导航
+    navigateBookmarks(direction, currentCard) {
+        const cards = Array.from(document.querySelectorAll('.bookmark-card'));
+        const currentIndex = cards.indexOf(currentCard);
+        let nextIndex = currentIndex;
+        
+        const cols = Math.floor(document.querySelector('.bookmarks-grid').offsetWidth / 320); // 估算列数
+        
+        switch (direction) {
+            case 'ArrowUp':
+                nextIndex = Math.max(0, currentIndex - cols);
+                break;
+            case 'ArrowDown':
+                nextIndex = Math.min(cards.length - 1, currentIndex + cols);
+                break;
+            case 'ArrowLeft':
+                nextIndex = Math.max(0, currentIndex - 1);
+                break;
+            case 'ArrowRight':
+                nextIndex = Math.min(cards.length - 1, currentIndex + 1);
+                break;
+        }
+        
+        if (nextIndex !== currentIndex) {
+            cards[currentIndex].blur();
+            cards[nextIndex].focus();
+            cards[nextIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     }
 
@@ -341,61 +420,47 @@ class EventManager {
 
     // 更新UI（统一的UI更新方法）
     updateUI() {
-        console.log('🔍 EventManager.updateUI 开始执行');
-        
         try {
-            console.log('📊 获取过滤后的书签...');
+            // 获取过滤后的书签
             const filteredBookmarks = this.dataManager.getFilteredBookmarks();
-            console.log('✅ 过滤后的书签:', filteredBookmarks);
             
-            console.log('📊 获取统计信息...');
+            // 获取统计信息
             const stats = this.dataManager.getStats();
-            console.log('✅ 统计信息:', stats);
             
             // 渲染书签
-            console.log('🎨 开始渲染书签...');
             this.uiManager.renderBookmarks(filteredBookmarks);
-            console.log('✅ 书签渲染完成');
             
             // 更新分类菜单
-            console.log('📂 更新分类菜单...');
             this.uiManager.updateCategoryMenu(
                 this.dataManager.getAllBookmarks(),
                 this.dataManager.getCurrentCategory()
             );
-            console.log('✅ 分类菜单更新完成');
             
             // 更新标签菜单
-            console.log('🏷️ 更新标签菜单...');
             this.uiManager.updateTagMenu(
                 this.dataManager.getAllBookmarks(),
                 this.dataManager.getCurrentTags()
             );
-            console.log('✅ 标签菜单更新完成');
             
             // 更新页面标题
-            console.log('📝 更新页面标题...');
             this.uiManager.updatePageTitle(
                 this.dataManager.getCurrentCategory(),
                 this.dataManager.getCurrentTags()
             );
-            console.log('✅ 页面标题更新完成');
-             
-             // 更新结果统计
-             console.log('📊 更新结果统计...');
-             this.uiManager.updateResultsCount(stats.filtered, stats.total);
-             console.log('✅ 结果统计更新完成');
-             
-             // 更新分类计数
-             console.log('🔢 更新分类计数...');
-             this.uiManager.updateCategoryCounts();
-             console.log('✅ 分类计数更新完成');
-             
-         } catch (error) {
-             console.error('❌ EventManager.updateUI 执行失败:', error);
-             console.error('错误堆栈:', error.stack);
-             throw error;
-         }
+            
+            // 更新结果统计
+            this.uiManager.updateResultsCount(
+                filteredBookmarks.length,
+                this.dataManager.getAllBookmarks().length
+            );
+            
+            // 更新分类计数
+            this.uiManager.updateCategoryCounts();
+            
+        } catch (error) {
+            console.error('❌ EventManager.updateUI 执行失败:', error);
+            console.error('错误堆栈:', error.stack);
+        }
     }
 
     // 设置下拉刷新功能（仅移动端）

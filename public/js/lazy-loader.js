@@ -36,7 +36,6 @@ class LazyLoader {
         );
 
         this.observeElements();
-        console.log('✅ 懒加载初始化完成');
     }
 
     // 观察需要懒加载的元素
@@ -52,8 +51,6 @@ class LazyLoader {
         contents.forEach(element => {
             this.observer.observe(element);
         });
-
-        console.log(`🔍 开始观察 ${images.length} 个图片和 ${contents.length} 个内容元素`);
     }
 
     // 处理元素进入视口
@@ -96,7 +93,6 @@ class LazyLoader {
             delete img.dataset.src;
             
             this.loadedImages.add(src);
-            console.log(`🖼️ 图片加载完成: ${src}`);
             
         } catch (error) {
             console.error(`❌ 图片加载失败: ${src}`, error);
@@ -178,8 +174,6 @@ class LazyLoader {
             // 移除 data-lazy 属性
             delete element.dataset.lazy;
             
-            console.log(`📦 内容加载完成: ${lazyType}`);
-            
         } catch (error) {
             console.error('内容加载失败:', error);
             element.classList.remove(this.options.loadingClass);
@@ -194,6 +188,12 @@ class LazyLoader {
         
         requestAnimationFrame(() => {
             element.style.opacity = '1';
+            // 确保opacity被正确设置
+            setTimeout(() => {
+                if (element.style.opacity !== '1') {
+                    element.style.opacity = '1';
+                }
+            }, 50);
         });
     }
 
@@ -244,8 +244,6 @@ class LazyLoader {
             this.showContent(element);
             delete element.dataset.lazy;
         });
-
-        console.log('📦 回退加载完成');
     }
 
     // 添加新元素到观察列表
@@ -287,7 +285,6 @@ class LazyLoader {
         
         try {
             await Promise.all(promises);
-            console.log(`✅ 预加载 ${urls.length} 个图片完成`);
         } catch (error) {
             console.warn('部分图片预加载失败:', error);
         }
@@ -302,8 +299,6 @@ class LazyLoader {
         
         this.loadedImages.clear();
         this.loadingImages.clear();
-        
-        console.log('🗑️ 懒加载器已销毁');
     }
 }
 
@@ -335,6 +330,17 @@ function setupBookmarksLazyLoading(bookmarks) {
             addLazyLoadingToBookmark(element, bookmarks[index]);
         }
     });
+    
+    // 确保懒加载器被正确初始化
+    if (window.lazyLoader) {
+        window.lazyLoader.refresh();
+    } else {
+        // 如果没有懒加载器，立即显示所有卡片
+        bookmarkElements.forEach(element => {
+            element.style.opacity = '1';
+            element.removeAttribute('data-lazy');
+        });
+    }
 }
 
 // 导出懒加载器

@@ -124,5 +124,28 @@
     <script src="js/ui.js"></script>
     <script src="js/events.js"></script>
     <script src="js/app.js"></script>
+    
+    <!-- 应用初始化 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查必要的类是否存在
+            if (typeof BookmarkApp === 'undefined') {
+                console.error('BookmarkApp 类未定义');
+                return;
+            }
+            
+            try {
+                // 创建应用实例并初始化
+                window.bookmarkApp = new BookmarkApp();
+                window.bookmarkApp.init().then(() => {
+                    // 应用初始化成功
+                }).catch(error => {
+                    console.error('应用初始化失败:', error);
+                });
+            } catch (error) {
+                console.error('创建应用实例失败:', error);
+            }
+        });
+    </script>
 </body>
 </html>

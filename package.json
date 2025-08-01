@@ -8,8 +8,7 @@
     "dev": "nodemon server.js",
     "setup": "npm install && npm run setup-env",
     "setup-env": "node -e \"const fs = require('fs'); if (!fs.existsSync('.env')) { fs.copyFileSync('.env.example', '.env'); console.log('✅ .env 文件已创建，请填入你的 Notion API 配置'); } else { console.log('⚠️  .env 文件已存在'); }\"",
-    "build": "echo '构建完成'",
-    "test": "echo '暂无测试'"
+    "build": "echo '构建完成'"
   },
   "keywords": [
     "notion",

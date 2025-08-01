@@ -21,8 +21,6 @@ class BookmarkApp {
     // 初始化应用
     async init() {
         try {
-            console.log('🚀 初始化书签应用...');
-            
             // 检查必要的DOM元素
             if (!this.checkRequiredElements()) {
                 throw new Error('缺少必要的DOM元素');
@@ -39,11 +37,6 @@ class BookmarkApp {
             
             // 记录性能指标
             this.performanceMetrics.loadTime = performance.now() - this.performanceMetrics.startTime;
-            
-            console.log(`✅ 应用初始化完成 (${this.performanceMetrics.loadTime.toFixed(2)}ms)`);
-            
-            // 显示应用就绪消息
-            //this.uiManager.showMessage('应用加载完成！', 'success');
             
         } catch (error) {
             console.error('❌ 应用初始化失败:', error);
@@ -73,8 +66,6 @@ class BookmarkApp {
 
     // 初始化各个模块
     initializeModules() {
-        console.log('📦 初始化模块...');
-        
         try {
             // 检查必要的类是否存在
             if (!window.ApiService) {
@@ -91,26 +82,28 @@ class BookmarkApp {
             }
             
             // 初始化API服务
-            console.log('初始化 ApiService...');
             this.apiService = new window.ApiService();
             
             // 初始化数据管理器
-            console.log('初始化 DataManager...');
             this.dataManager = new window.DataManager();
             
             // 初始化UI管理器
-            console.log('初始化 UIManager...');
             this.uiManager = new window.UIManager();
             
             // 初始化事件管理器
-            console.log('初始化 EventManager...');
             this.eventManager = new window.EventManager(
                 this.dataManager,
                 this.uiManager,
                 this.apiService
             );
             
-            console.log('✅ 所有模块初始化完成');
+            // 初始化懒加载器
+            if (window.LazyLoader) {
+                window.lazyLoader = new window.LazyLoader();
+            } else {
+                console.warn('LazyLoader 类未找到，懒加载功能将不可用');
+            }
+            
         } catch (error) {
             console.error('❌ 模块初始化失败:', error);
             throw error;
@@ -119,8 +112,6 @@ class BookmarkApp {
 
     // 加载初始数据
     async loadInitialData() {
-        console.log('📊 加载初始数据...');
-        
         this.uiManager.showLoading(true);
         
         try {
@@ -130,17 +121,12 @@ class BookmarkApp {
                 this.loadBookmarks()
             ]);
             
-            console.log('Promise.all results:', results);
-            
             // 安全解构，确保results是数组
             if (!Array.isArray(results) || results.length < 2) {
                 throw new Error('Promise.all 返回结果格式错误');
             }
             
             const [siteConfig, bookmarks] = results;
-            
-            console.log('siteConfig:', siteConfig);
-            console.log('bookmarks:', bookmarks);
             
             // 设置网站配置
             if (siteConfig) {
@@ -166,7 +152,6 @@ class BookmarkApp {
     async loadSiteConfig() {
         try {
             const config = await this.apiService.getSiteConfig();
-            console.log('✅ 网站配置加载完成');
             return config;
         } catch (error) {
             console.warn('⚠️ 网站配置加载失败，使用默认配置:', error);
@@ -178,41 +163,29 @@ class BookmarkApp {
     async loadBookmarks() {
         try {
             const bookmarks = await this.apiService.getBookmarks();
-            console.log(`✅ 书签数据加载完成 (${bookmarks.length} 条)`);
             return bookmarks;
         } catch (error) {
             console.error('❌ 书签数据加载失败:', error);
-            
-            // 数据加载失败时返回空数组，显示空状态提示
-            console.log('📭 显示空状态提示...');
-            return [];
+            throw error;
         }
     }
 
     // 执行初始渲染
     performInitialRender() {
-        const renderStart = performance.now();
-        
-        // 更新UI
-        console.log('🔍 开始执行updateUI');
-        console.log('📊 dataManager状态:', {
-            allBookmarks: this.dataManager.getAllBookmarks(),
-            filteredBookmarks: this.dataManager.getFilteredBookmarks(),
-            currentCategory: this.dataManager.getCurrentCategory()
-        });
-        
         try {
+            // 记录渲染开始时间
+            const renderStartTime = performance.now();
+            
+            // 执行UI更新
             this.eventManager.updateUI();
-            console.log('✅ updateUI执行成功');
+            
+            // 记录渲染完成时间
+            this.performanceMetrics.renderTime = performance.now() - renderStartTime;
+            
         } catch (error) {
             console.error('❌ updateUI执行失败:', error);
-            throw error;
+            this.handleInitError(error);
         }
-        
-        // 记录渲染时间
-        this.performanceMetrics.renderTime = performance.now() - renderStart;
-        
-        console.log(`🎨 初始渲染完成 (${this.performanceMetrics.renderTime.toFixed(2)}ms)`);
     }
 
     // 更新网站标题
@@ -353,26 +326,10 @@ class BookmarkApp {
 }
 
 // 全局应用实例
-let bookmarkApp = null;
-
-// DOM 加载完成后初始化应用
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('📱 DOM 加载完成，开始初始化应用...');
-    
-    // 创建应用实例
-    bookmarkApp = new BookmarkApp();
-    
-    // 初始化应用
-    await bookmarkApp.init();
-    
-    // 将应用实例暴露到全局（用于调试）
-    window.bookmarkApp = bookmarkApp;
-});
-
 // 页面卸载时清理资源
 window.addEventListener('beforeunload', function() {
-    if (bookmarkApp) {
-        bookmarkApp.destroy();
+    if (window.bookmarkApp) {
+        window.bookmarkApp.destroy();
     }
 });
 

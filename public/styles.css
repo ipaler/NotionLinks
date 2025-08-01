@@ -749,6 +749,62 @@ img[data-src] {
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
         gap: 16px;
     }
+    
+    /* 移动端快速访问按钮样式 */
+    .bookmark-actions {
+        opacity: 1 !important;
+        transform: translateX(0) !important;
+        position: absolute !important;
+        top: 8px !important;
+        right: 8px !important;
+        margin-left: 0 !important;
+    }
+    
+    .bookmark-quick-access {
+        width: 28px;
+        height: 28px;
+        font-size: 11px;
+        background: rgba(46, 170, 220, 0.9) !important;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .bookmark-quick-access:hover {
+        background: rgba(46, 170, 220, 1) !important;
+        transform: scale(1.05);
+    }
+    
+    /* 移动端触摸反馈 */
+    .bookmark-quick-access:active {
+        transform: scale(0.95) !important;
+        background: rgba(46, 170, 220, 0.8) !important;
+    }
+    
+    /* 确保移动端按钮有足够的触摸区域 */
+    .bookmark-quick-access {
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* 平板设备优化 */
+    @media (max-width: 768px) {
+        .bookmark-actions {
+            opacity: 1 !important;
+            transform: translateX(0) !important;
+            position: absolute !important;
+            top: 8px !important;
+            right: 8px !important;
+        }
+        
+        .bookmark-quick-access {
+            background: rgba(46, 170, 220, 0.9) !important;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    }
 }
 
 @media (max-width: 640px) {
@@ -810,6 +866,30 @@ img[data-src] {
     .bookmarks-grid {
         grid-template-columns: 1fr;
         gap: 12px;
+    }
+    
+    /* 小屏幕移动端快速访问按钮样式 */
+    .bookmark-actions {
+        opacity: 1 !important;
+        transform: translateX(0) !important;
+        position: absolute !important;
+        top: 6px !important;
+        right: 6px !important;
+        margin-left: 0 !important;
+    }
+    
+    .bookmark-quick-access {
+        width: 26px;
+        height: 26px;
+        font-size: 10px;
+        background: rgba(46, 170, 220, 0.9) !important;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .bookmark-quick-access:hover {
+        background: rgba(46, 170, 220, 1) !important;
+        transform: scale(1.05);
     }
     
     .logo {
@@ -922,6 +1002,7 @@ img[data-src] {
     transition: all 0.2s;
     position: relative;
     overflow: hidden;
+    outline: none;
 }
 
 .bookmark-card:hover {
@@ -929,11 +1010,23 @@ img[data-src] {
     transform: translateY(-2px);
 }
 
+.bookmark-card:focus {
+    outline: 2px solid #2eaadc;
+    outline-offset: 2px;
+    box-shadow: 0 4px 12px rgba(46, 170, 220, 0.2);
+}
+
+.bookmark-card:focus .bookmark-actions {
+    opacity: 1;
+    transform: translateX(0);
+}
+
 .bookmark-header {
     display: flex;
     align-items: flex-start;
     gap: 12px;
     margin-bottom: 12px;
+    position: relative;
 }
 
 .bookmark-favicon {
@@ -954,6 +1047,11 @@ img[data-src] {
     border-radius: 4px;
 }
 
+.bookmark-info {
+    flex: 1;
+    min-width: 0;
+}
+
 .bookmark-title {
     font-size: 16px;
     font-weight: 600;
@@ -966,6 +1064,55 @@ img[data-src] {
     font-size: 12px;
     color: #9b9a97;
     text-decoration: none;
+}
+
+/* 快速访问按钮 */
+.bookmark-actions {
+    position: absolute;
+    top: 0;
+    right: 0;
+    opacity: 0;
+    transform: translateX(10px);
+    transition: all 0.3s ease;
+}
+
+.bookmark-card:hover .bookmark-actions {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.bookmark-quick-access {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: linear-gradient(135deg, #2eaadc 0%, #2596be 100%);
+    color: white;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(46, 170, 220, 0.3);
+}
+
+.bookmark-quick-access:hover {
+    background: linear-gradient(135deg, #2596be 0%, #1e7ba8 100%);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(46, 170, 220, 0.4);
+}
+
+.bookmark-quick-access:active {
+    transform: scale(0.95);
+}
+
+.bookmark-quick-access i {
+    transition: transform 0.3s ease;
+}
+
+.bookmark-quick-access:hover i {
+    transform: translateX(1px) translateY(-1px);
 }
 
 .bookmark-description {
@@ -1162,6 +1309,161 @@ img[data-src] {
 
 .modal-body {
     padding: 24px;
+}
+
+/* 书签详情样式 */
+.bookmark-detail-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e9e9e7;
+}
+
+.bookmark-detail-favicon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    background-color: #f7f6f3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bookmark-detail-favicon img {
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+}
+
+.bookmark-detail-info h3 {
+    margin: 0 0 8px 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: #37352f;
+}
+
+.bookmark-detail-url a {
+    color: #2eaadc;
+    text-decoration: none;
+    font-size: 14px;
+    transition: color 0.2s;
+}
+
+.bookmark-detail-url a:hover {
+    color: #2596be;
+    text-decoration: underline;
+}
+
+.bookmark-detail-content {
+    margin-bottom: 24px;
+}
+
+.detail-section {
+    margin-bottom: 20px;
+}
+
+.detail-section h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.detail-section p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #37352f;
+}
+
+.bookmark-detail-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.bookmark-detail-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e9e9e7;
+}
+
+.detail-action-btn {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.detail-action-btn.primary {
+    background: linear-gradient(135deg, #2eaadc 0%, #2596be 100%);
+    color: white;
+}
+
+.detail-action-btn.primary:hover {
+    background: linear-gradient(135deg, #2596be 0%, #1e7ba8 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(46, 170, 220, 0.3);
+}
+
+.detail-action-btn.secondary {
+    background: #f8f9fa;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+}
+
+.detail-action-btn.secondary:hover {
+    background: #e9ecef;
+    color: #495057;
+    transform: translateY(-1px);
+}
+
+.usage-tips {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.usage-tips h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057;
+}
+
+.usage-tips ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.usage-tips li {
+    margin-bottom: 6px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #6c757d;
+}
+
+.usage-tips li:last-child {
+    margin-bottom: 0;
+}
+
+.usage-tips strong {
+    color: #495057;
+    font-weight: 600;
 }
 
 /* 响应式设计 */
@@ -1396,5 +1698,52 @@ img[data-src] {
     .retry-btn {
         padding: 10px 20px;
         font-size: 14px;
+    }
+}
+
+/* 移动端快速访问按钮 - 始终显示 */
+@media (max-width: 968px) {
+    .bookmark-card .bookmark-actions {
+        opacity: 1 !important;
+        transform: translateX(0) !important;
+        position: absolute !important;
+        top: 8px !important;
+        right: 8px !important;
+        z-index: 20 !important;
+    }
+    
+    .bookmark-card .bookmark-quick-access {
+        background: rgba(46, 170, 220, 0.9) !important;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        min-width: 44px;
+        min-height: 44px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    .bookmark-card .bookmark-quick-access:hover {
+        background: rgba(46, 170, 220, 1) !important;
+        transform: scale(1.05);
+    }
+    
+    .bookmark-card .bookmark-quick-access:active {
+        transform: scale(0.95) !important;
+        background: rgba(46, 170, 220, 0.8) !important;
+    }
+}
+
+/* 小屏幕移动端优化 */
+@media (max-width: 640px) {
+    .bookmark-card .bookmark-actions {
+        top: 6px !important;
+        right: 6px !important;
+    }
+    
+    .bookmark-card .bookmark-quick-access {
+        width: 26px;
+        height: 26px;
+        font-size: 10px;
+        min-width: 26px;
+        min-height: 26px;
     }
 }

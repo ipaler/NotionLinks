@@ -41,8 +41,6 @@ app.get('/api/config', (req, res) => {
 // API 路由：获取书签数据
 app.get('/api/bookmarks', async (req, res) => {
     try {
-        console.log('正在从Notion获取书签数据...');
-        
         // 调用 Notion API 获取数据，增加超时配置// 创建AbortController用于超时控制
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
@@ -85,8 +83,6 @@ app.get('/api/bookmarks', async (req, res) => {
                 lastEditedTime: page.last_edited_time
             };
         });
-
-        console.log(`成功获取 ${bookmarks.length} 个书签`);
         
         res.json({
             success: true,

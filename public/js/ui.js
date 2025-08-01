@@ -73,6 +73,7 @@ class UIManager {
         const card = document.createElement('div');
         card.className = 'bookmark-card';
         card.dataset.id = bookmark.id || '';
+        card.tabIndex = 0; // 使卡片可以通过Tab键聚焦
         
         // 安全获取URL主机名
         let hostname = '';
@@ -101,6 +102,11 @@ class UIManager {
                 <div class="bookmark-info">
                     <h3 class="bookmark-title">${bookmark.title || '无标题'}</h3>
                     <p class="bookmark-url">${hostname}</p>
+                </div>
+                <div class="bookmark-actions">
+                    <button class="bookmark-quick-access" title="快速访问" data-url="${bookmark.url || ''}">
+                        <i class="fas fa-external-link-alt"></i>
+                    </button>
                 </div>
             </div>
             <div class="bookmark-content">
@@ -154,6 +160,17 @@ class UIManager {
         if (window.setupBookmarksLazyLoading) {
             window.setupBookmarksLazyLoading(bookmarks);
         }
+        
+        // 紧急修复：确保所有卡片都能显示
+        setTimeout(() => {
+            const cards = this.elements.bookmarksGrid.querySelectorAll('.bookmark-card');
+            cards.forEach(card => {
+                if (card.style.opacity === '0' || card.style.opacity === '') {
+                    card.style.opacity = '1';
+                    card.removeAttribute('data-lazy');
+                }
+            });
+        }, 100);
     }
 
     // 显示空状态
@@ -208,56 +225,114 @@ class UIManager {
         });
     }
 
-    // 显示书签详情模态框
+    // 显示书签详情
     showBookmarkDetails(bookmark) {
-        this.elements.modalTitle.textContent = bookmark.title;
+        if (!this.elements.modal || !this.elements.modalTitle || !this.elements.modalBody) {
+            console.warn('模态框元素未找到');
+            return;
+        }
         
-        const tagsHTML = bookmark.tags ? bookmark.tags.map(tag => `<span class="tag">${tag}</span>`).join('') : '';
-        const createdDate = new Date(bookmark.createdTime).toLocaleString('zh-CN');
-        const editedDate = new Date(bookmark.lastEditedTime).toLocaleString('zh-CN');
+        // 安全获取URL主机名
+        let hostname = '';
+        try {
+            hostname = bookmark.url ? new URL(bookmark.url).hostname : '未知网站';
+        } catch (e) {
+            hostname = '未知网站';
+        }
         
+        // 安全格式化日期
+        let formattedDate = '未知日期';
+        let lastEditedDate = '未知日期';
+        try {
+            if (bookmark.createdTime) {
+                formattedDate = new Date(bookmark.createdTime).toLocaleString('zh-CN');
+            }
+            if (bookmark.lastEditedTime) {
+                lastEditedDate = new Date(bookmark.lastEditedTime).toLocaleString('zh-CN');
+            }
+        } catch (e) {
+            formattedDate = '未知日期';
+            lastEditedDate = '未知日期';
+        }
+        
+        const tagsHTML = bookmark.tags && Array.isArray(bookmark.tags) ? bookmark.tags.map(tag => 
+            `<span class="tag">${tag}</span>`
+        ).join('') : '';
+        
+        this.elements.modalTitle.textContent = bookmark.title || '无标题';
         this.elements.modalBody.innerHTML = `
-            <div style="margin-bottom: 16px;">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <div class="bookmark-favicon">
-                        <img src="${this.getFaviconUrl(bookmark.url)}" alt="" class="favicon">
-                    </div>
-                    <div>
-                        <h3 style="margin: 0; font-size: 18px;">${bookmark.title}</h3>
-                        <a href="${bookmark.url}" target="_blank" style="color: #2eaadc; text-decoration: none; font-size: 14px;">
-                            ${bookmark.url}
+            <div class="bookmark-detail-header">
+                <div class="bookmark-detail-favicon">
+                    <img alt="" class="favicon" 
+                         src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='16' height='16' fill='%23f0f0f0'/%3E%3C/svg%3E">
+                </div>
+                <div class="bookmark-detail-info">
+                    <h3>${bookmark.title || '无标题'}</h3>
+                    <p class="bookmark-detail-url">
+                        <a href="${bookmark.url || '#'}" target="_blank" rel="noopener noreferrer">
+                            ${hostname}
                         </a>
-                    </div>
+                    </p>
                 </div>
-                
-                ${bookmark.description ? `
-                    <div style="margin-bottom: 16px;">
-                        <h4 style="margin: 0 0 8px 0; font-size: 14px; color: #666;">描述</h4>
-                        <p style="margin: 0; line-height: 1.6;">${bookmark.description}</p>
-                    </div>
-                ` : ''}
-                
-                <div style="margin-bottom: 16px;">
-                    <h4 style="margin: 0 0 8px 0; font-size: 14px; color: #666;">分类</h4>
-                    <span class="category-tag">${bookmark.category || '未分类'}</span>
+            </div>
+            <div class="bookmark-detail-content">
+                <div class="detail-section">
+                    <h4>描述</h4>
+                    <p>${bookmark.description || '暂无描述'}</p>
                 </div>
-                
-                ${bookmark.tags && bookmark.tags.length > 0 ? `
-                    <div style="margin-bottom: 16px;">
-                        <h4 style="margin: 0 0 8px 0; font-size: 14px; color: #666;">标签</h4>
-                        <div class="bookmark-tags">${tagsHTML}</div>
-                    </div>
-                ` : ''}
-                
-                <div style="font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 12px;">
-                    <div>创建时间: ${createdDate}</div>
-                    <div>最后编辑: ${editedDate}</div>
+                <div class="detail-section">
+                    <h4>分类</h4>
+                    <p>${bookmark.category || '未分类'}</p>
                 </div>
+                <div class="detail-section">
+                    <h4>标签</h4>
+                    <div class="bookmark-detail-tags">${tagsHTML}</div>
+                </div>
+                <div class="detail-section">
+                    <h4>创建时间</h4>
+                    <p>${formattedDate}</p>
+                </div>
+                <div class="detail-section">
+                    <h4>最后编辑</h4>
+                    <p>${lastEditedDate}</p>
+                </div>
+            </div>
+            <div class="bookmark-detail-actions">
+                <button class="detail-action-btn primary" onclick="window.open('${bookmark.url || '#'}', '_blank')">
+                    <i class="fas fa-external-link-alt"></i>
+                    访问网站
+                </button>
+                <button class="detail-action-btn secondary" onclick="navigator.clipboard.writeText('${bookmark.url || ''}')">
+                    <i class="fas fa-copy"></i>
+                    复制链接
+                </button>
+            </div>
+            <div class="usage-tips">
+                <h4>💡 使用提示</h4>
+                <ul>
+                    <li><strong>快速访问：</strong>悬停卡片右上角会出现快速访问按钮</li>
+                    <li><strong>双击卡片：</strong>直接在新标签页打开链接</li>
+                    <li><strong>键盘导航：</strong>使用Tab键和方向键导航，Enter键快速访问</li>
+                    <li><strong>搜索：</strong>按Ctrl+K快速聚焦搜索框</li>
+                </ul>
             </div>
         `;
         
+        // 异步加载favicon
+        const faviconImg = this.elements.modalBody.querySelector('.favicon');
+        if (faviconImg && bookmark.url) {
+            this.loadFaviconWithFallback(faviconImg, bookmark.url);
+        }
+        
         this.elements.modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
+        
+        // 添加复制链接的成功提示
+        const copyBtn = this.elements.modalBody.querySelector('.detail-action-btn.secondary');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+                this.showMessage('链接已复制到剪贴板！', 'success');
+            });
+        }
     }
 
     // 关闭模态框
