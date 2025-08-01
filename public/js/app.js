@@ -49,16 +49,23 @@ class BookmarkApp {
         const requiredElements = [
             'bookmarksGrid',
             'categoryMenu',
-            'tagMenu',
             'searchInput',
             'pageTitle'
         ];
         
+        const missingElements = [];
+        
         for (const elementId of requiredElements) {
-            if (!document.getElementById(elementId)) {
+            const element = document.getElementById(elementId);
+            if (!element) {
                 console.error(`缺少必要元素: ${elementId}`);
-                return false;
+                missingElements.push(elementId);
             }
+        }
+        
+        if (missingElements.length > 0) {
+            console.error('缺少以下必要元素:', missingElements);
+            return false;
         }
         
         return true;
@@ -231,11 +238,58 @@ class BookmarkApp {
 
     // 处理数据加载错误
     handleDataLoadError(error) {
-        this.uiManager.showMessage('数据加载失败，请检查Notion配置', 'error');
+        console.error('数据加载失败:', error);
+        
+        // 根据错误类型显示不同的提示
+        let errorMessage = '数据加载失败，请稍后重试';
+        let errorType = 'error';
+        
+        if (error.type === 'offline') {
+            errorMessage = '网络连接已断开，请检查网络设置后重试';
+            errorType = 'warning';
+        } else if (error.type === 'timeout') {
+            errorMessage = '请求超时，可能是网络较慢，正在自动重试...';
+            errorType = 'info';
+        } else if (error.type === 'server') {
+            errorMessage = '服务器暂时不可用，正在自动重试...';
+            errorType = 'warning';
+        } else if (error.type === 'network') {
+            errorMessage = '网络连接异常，正在自动重试...';
+            errorType = 'warning';
+        }
+        
+        this.uiManager.showMessage(errorMessage, errorType);
         
         // 设置空数据，显示空状态提示
         this.dataManager.setBookmarks([]);
         this.performInitialRender();
+        
+        // 如果是可重试的错误，尝试重新加载
+        if (error.retryable && this.retryCount < this.maxRetries) {
+            this.scheduleRetry();
+        }
+    }
+
+    // 安排重试
+    scheduleRetry() {
+        this.retryCount++;
+        const delay = Math.min(2000 * this.retryCount, 10000); // 最大10秒延迟
+        
+        console.log(`🔄 安排第${this.retryCount}次重试 (${delay}ms后)`);
+        
+        setTimeout(async () => {
+            try {
+                console.log(`🔄 开始第${this.retryCount}次重试`);
+                await this.loadInitialData();
+            } catch (error) {
+                console.error(`❌ 第${this.retryCount}次重试失败:`, error);
+                if (this.retryCount < this.maxRetries) {
+                    this.scheduleRetry();
+                } else {
+                    this.uiManager.showMessage('多次重试失败，请检查网络连接或刷新页面', 'error');
+                }
+            }
+        }, delay);
     }
 
     // 显示错误页面

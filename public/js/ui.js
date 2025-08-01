@@ -4,14 +4,20 @@ class UIManager {
         // 安全获取DOM元素，避免null引用错误
         this.elements = {};
         
+        // favicon缓存
+        this.faviconCache = new Map();
+        
         try {
             this.elements = {
                 bookmarksGrid: document.getElementById('bookmarksGrid'),
                 categoryMenu: document.getElementById('categoryMenu'),
-                tagMenu: document.getElementById('tagMenu'),
+                tagsFilterBar: document.getElementById('tagsFilterBar'),
+                tagsFilterContent: document.getElementById('tagsFilterContent'),
+                clearTagsBtn: document.getElementById('clearTagsBtn'),
                 searchInput: document.getElementById('searchInput'),
                 pageTitle: document.getElementById('pageTitle'),
                 syncBtn: document.getElementById('syncBtn'),
+                diagnoseBtn: document.getElementById('diagnoseBtn'),
                 backToTop: document.getElementById('backToTop'),
                 loading: document.getElementById('loading'),
                 modal: document.getElementById('bookmarkModal'),
@@ -23,31 +29,7 @@ class UIManager {
                 sidebarOverlay: document.getElementById('sidebarOverlay')
             };
         } catch (error) {
-            console.warn('UIManager: 部分DOM元素获取失败:', error);
-        }
-        
-        this.lazyLoadObserver = null;
-        this.initLazyLoading();
-    }
-
-    // 初始化懒加载
-    initLazyLoading() {
-        if ('IntersectionObserver' in window) {
-            this.lazyLoadObserver = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const img = entry.target;
-                        if (img.dataset.src) {
-                            img.src = img.dataset.src;
-                            img.removeAttribute('data-src');
-                            this.lazyLoadObserver.unobserve(img);
-                        }
-                    }
-                });
-            }, {
-                rootMargin: '50px 0px',
-                threshold: 0.01
-            });
+            // 静默处理DOM元素获取失败
         }
     }
 
@@ -62,13 +44,16 @@ class UIManager {
     createBookmarkCard(bookmark) {
         // 安全检查
         if (!bookmark || typeof bookmark !== 'object') {
-            console.warn('createBookmarkCard: 无效的书签数据', bookmark);
             return document.createElement('div');
         }
         
-        const tagsHTML = bookmark.tags && Array.isArray(bookmark.tags) ? bookmark.tags.map(tag => 
-            `<span class="tag">${tag}</span>`
-        ).join('') : '';
+        // 限制标签显示数量为5个
+        const allTags = bookmark.tags && Array.isArray(bookmark.tags) ? bookmark.tags : [];
+        const displayTags = allTags.slice(0, 5);
+        const hasMoreTags = allTags.length > 5;
+        
+        const tagsHTML = displayTags.map(tag => `<span class="tag">${tag}</span>`).join('');
+        const tagsClass = hasMoreTags ? 'bookmark-tags has-more' : 'bookmark-tags';
         
         const card = document.createElement('div');
         card.className = 'bookmark-card';
@@ -81,16 +66,6 @@ class UIManager {
             hostname = bookmark.url ? new URL(bookmark.url).hostname : '未知网站';
         } catch (e) {
             hostname = '未知网站';
-        }
-        
-        // 安全格式化日期
-        let formattedDate = '未知日期';
-        try {
-            if (bookmark.createdTime) {
-                formattedDate = new Date(bookmark.createdTime).toLocaleDateString('zh-CN');
-            }
-        } catch (e) {
-            formattedDate = '未知日期';
         }
         
         card.innerHTML = `
@@ -111,11 +86,7 @@ class UIManager {
             </div>
             <div class="bookmark-content">
                 <p class="bookmark-description">${bookmark.description || '暂无描述'}</p>
-                <div class="bookmark-tags">${tagsHTML}</div>
-            </div>
-            <div class="bookmark-footer">
-                <span class="bookmark-category">${bookmark.category || '未分类'}</span>
-                <span class="bookmark-date">${formattedDate}</span>
+                <div class="${tagsClass}">${tagsHTML}</div>
             </div>
         `;
         
@@ -133,11 +104,14 @@ class UIManager {
 
     // 渲染书签网格
     renderBookmarks(bookmarks) {
-        if (!this.elements.bookmarksGrid) return;
+        if (!this.elements.bookmarksGrid) {
+            console.error('bookmarksGrid元素不存在');
+            return;
+        }
         
         this.showLoading(false);
         
-        if (bookmarks.length === 0) {
+        if (!bookmarks || bookmarks.length === 0) {
             this.showEmptyState();
             return;
         }
@@ -145,21 +119,44 @@ class UIManager {
         // 使用文档片段提高性能
         const fragment = document.createDocumentFragment();
         
-        bookmarks.forEach(bookmark => {
-            const card = this.createBookmarkCard(bookmark);
-            fragment.appendChild(card);
-        });
+        // 检查是否为分组数据
+        if (Array.isArray(bookmarks) && bookmarks.length > 0 && bookmarks[0].category && bookmarks[0].bookmarks) {
+            // 分组数据
+            bookmarks.forEach(group => {
+                // 创建分组标题
+                const groupHeader = document.createElement('div');
+                groupHeader.className = 'bookmark-group-header';
+                groupHeader.innerHTML = `
+                    <h3 class="group-title">${group.category}</h3>
+                    <span class="group-count">${group.bookmarks.length} 个书签</span>
+                `;
+                fragment.appendChild(groupHeader);
+                
+                // 创建分组容器
+                const groupContainer = document.createElement('div');
+                groupContainer.className = 'bookmark-group';
+                
+                // 添加书签卡片
+                group.bookmarks.forEach(bookmark => {
+                    const card = this.createBookmarkCard(bookmark);
+                    groupContainer.appendChild(card);
+                });
+                
+                fragment.appendChild(groupContainer);
+            });
+        } else {
+            // 普通书签数组
+            bookmarks.forEach(bookmark => {
+                const card = this.createBookmarkCard(bookmark);
+                fragment.appendChild(card);
+            });
+        }
         
         this.elements.bookmarksGrid.innerHTML = '';
         this.elements.bookmarksGrid.appendChild(fragment);
         
         // 重新绑定事件
         this.bindBookmarkEvents();
-        
-        // 应用懒加载（如果可用）
-        if (window.setupBookmarksLazyLoading) {
-            window.setupBookmarksLazyLoading(bookmarks);
-        }
         
         // 紧急修复：确保所有卡片都能显示
         setTimeout(() => {
@@ -199,28 +196,28 @@ class UIManager {
             .sort(([,a], [,b]) => b - a)
             .slice(0, 20);
         
-        const tagMenuHtml = sortedTags.map(([tag, count]) => `
-            <li class="menu-item tag-item" data-tag="${tag}">
-                <i class="fas fa-tag"></i>
+        // 更新标签筛选栏
+        const filterTagsHtml = sortedTags.map(([tag, count]) => `
+            <div class="filter-tag ${currentTags.includes(tag) ? 'selected' : ''}" data-tag="${tag}">
                 <span>${tag}</span>
                 <span class="tag-count">${count}</span>
-            </li>
+            </div>
         `).join('');
         
-        const clearAllHtml = currentTags.length > 0 ? `
-            <li class="menu-item" id="clearTags">
-                <i class="fas fa-times-circle"></i>
-                <span>清除选择</span>
-            </li>
-        ` : '';
+        if (this.elements.tagsFilterContent) {
+            this.elements.tagsFilterContent.innerHTML = filterTagsHtml;
+        }
         
-        this.elements.tagMenu.innerHTML = clearAllHtml + tagMenuHtml;
+        // 更新清除按钮显示状态
+        if (this.elements.clearTagsBtn) {
+            this.elements.clearTagsBtn.style.display = currentTags.length > 0 ? 'flex' : 'none';
+        }
         
         // 更新选中状态
         currentTags.forEach(tag => {
-            const tagElement = this.elements.tagMenu.querySelector(`[data-tag="${tag}"]`);
-            if (tagElement) {
-                tagElement.classList.add('selected');
+            const filterTagElement = this.elements.tagsFilterContent?.querySelector(`[data-tag="${tag}"]`);
+            if (filterTagElement) {
+                filterTagElement.classList.add('selected');
             }
         });
     }
@@ -228,7 +225,6 @@ class UIManager {
     // 显示书签详情
     showBookmarkDetails(bookmark) {
         if (!this.elements.modal || !this.elements.modalTitle || !this.elements.modalBody) {
-            console.warn('模态框元素未找到');
             return;
         }
         
@@ -265,7 +261,7 @@ class UIManager {
                 <div class="bookmark-detail-favicon">
                     <img alt="" class="favicon" 
                          src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='16' height='16' fill='%23f0f0f0'/%3E%3C/svg%3E">
-                </div>
+                    </div>
                 <div class="bookmark-detail-info">
                     <h3>${bookmark.title || '无标题'}</h3>
                     <p class="bookmark-detail-url">
@@ -274,7 +270,7 @@ class UIManager {
                         </a>
                     </p>
                 </div>
-            </div>
+                    </div>
             <div class="bookmark-detail-content">
                 <div class="detail-section">
                     <h4>描述</h4>
@@ -283,7 +279,7 @@ class UIManager {
                 <div class="detail-section">
                     <h4>分类</h4>
                     <p>${bookmark.category || '未分类'}</p>
-                </div>
+                    </div>
                 <div class="detail-section">
                     <h4>标签</h4>
                     <div class="bookmark-detail-tags">${tagsHTML}</div>
@@ -291,7 +287,7 @@ class UIManager {
                 <div class="detail-section">
                     <h4>创建时间</h4>
                     <p>${formattedDate}</p>
-                </div>
+                    </div>
                 <div class="detail-section">
                     <h4>最后编辑</h4>
                     <p>${lastEditedDate}</p>
@@ -343,85 +339,112 @@ class UIManager {
 
     // 更新页面标题
     updatePageTitle(category, tags) {
-        let title = '全部书签';
+        let title = '全部';
         
         if (category !== 'all') {
-            title = `${category} 书签`;
-        }
-        
-        if (tags.length > 0) {
-            const tagText = tags.join(', ');
-            title += ` · ${tagText}`;
+            title = `${category}`;
         }
         
         this.elements.pageTitle.textContent = title;
         document.title = `${title} - ${window.siteConfig?.siteTitle || '书签管理'}`;
     }
 
-    // 更新结果统计
-    updateResultsCount(filteredCount, totalCount) {
-        const existingCount = document.querySelector('.results-count');
-        if (existingCount) {
-            existingCount.remove();
+    // 显示消息提示
+    showMessage(message, type = 'info', duration = 5000) {
+        // 移除现有的消息
+        const existingMessage = document.querySelector('.message-toast');
+        if (existingMessage) {
+            existingMessage.remove();
         }
+
+        // 创建消息元素
+        const messageElement = document.createElement('div');
+        messageElement.className = `message-toast message-${type}`;
         
-        if (filteredCount !== totalCount) {
-            const countElement = document.createElement('span');
-            countElement.className = 'results-count';
-            countElement.textContent = `(${filteredCount}/${totalCount})`;
-            countElement.style.cssText = 'color: #666; font-size: 14px; margin-left: 8px;';
-            this.elements.pageTitle.appendChild(countElement);
+        // 根据类型设置图标
+        let icon = 'info-circle';
+        if (type === 'success') icon = 'check-circle';
+        else if (type === 'error') icon = 'exclamation-triangle';
+        else if (type === 'warning') icon = 'exclamation-circle';
+        
+        messageElement.innerHTML = `
+            <i class="fas fa-${icon}"></i>
+            <span>${message}</span>
+            <button class="message-close">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+
+        // 添加到页面
+        document.body.appendChild(messageElement);
+
+        // 显示动画
+        setTimeout(() => {
+            messageElement.classList.add('show');
+        }, 10);
+
+        // 自动隐藏
+        if (duration > 0) {
+            setTimeout(() => {
+                this.hideMessage(messageElement);
+            }, duration);
         }
+
+        // 点击关闭
+        const closeBtn = messageElement.querySelector('.message-close');
+        closeBtn.addEventListener('click', () => {
+            this.hideMessage(messageElement);
+        });
+
+        return messageElement;
     }
 
-    // 显示消息提示
-    showMessage(message, type = 'info') {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message message-${type}`;
-        messageDiv.innerHTML = `
-            <div class="message-content">
-                <i class="fas ${type === 'error' ? 'fa-exclamation-circle' : type === 'success' ? 'fa-check-circle' : 'fa-info-circle'}"></i>
-                <span>${message}</span>
-            </div>
-        `;
-        
-        messageDiv.style.cssText = `
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            background: ${type === 'error' ? '#ff4757' : type === 'success' ? '#2ed573' : '#3742fa'};
-            color: white;
-            padding: 12px 16px;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 10000;
-            animation: slideInRight 0.3s ease;
-        `;
-        
-        document.body.appendChild(messageDiv);
-        
-        setTimeout(() => {
-            messageDiv.style.animation = 'slideOutRight 0.3s ease';
+    // 隐藏消息提示
+    hideMessage(messageElement) {
+        if (messageElement && messageElement.parentNode) {
+            messageElement.classList.remove('show');
             setTimeout(() => {
-                if (messageDiv.parentNode) {
-                    messageDiv.parentNode.removeChild(messageDiv);
+                if (messageElement.parentNode) {
+                    messageElement.remove();
                 }
             }, 300);
-        }, 3000);
+        }
     }
 
-    // 获取网站图标URL
-    getFaviconUrl(url) {
-        try {
-            const domain = new URL(url).hostname;
-            // 只使用Google和原站点的API
-            const apis = [
-                `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
-                `https://${domain}/favicon.ico`
-            ];
-            return apis[0]; // 默认使用第一个API
-        } catch {
-            return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="16" height="16"%3E%3Crect width="16" height="16" fill="%23ddd"/%3E%3C/svg%3E';
+    // 显示网络状态
+    showNetworkStatus(status) {
+        const statusElement = document.querySelector('.network-status');
+        if (statusElement) {
+            statusElement.remove();
+        }
+
+        const element = document.createElement('div');
+        element.className = `network-status network-${status.isOnline ? 'online' : 'offline'}`;
+        
+        element.innerHTML = `
+            <i class="fas fa-${status.isOnline ? 'wifi' : 'wifi-slash'}"></i>
+            <span>${status.isOnline ? '网络已连接' : '网络已断开'}</span>
+        `;
+
+        document.body.appendChild(element);
+
+        // 3秒后自动隐藏
+        setTimeout(() => {
+            this.hideNetworkStatus(element);
+        }, 3000);
+
+        return element;
+    }
+
+    // 隐藏网络状态
+    hideNetworkStatus(statusElement) {
+        if (statusElement && statusElement.parentNode) {
+            statusElement.classList.add('fade-out');
+            setTimeout(() => {
+                if (statusElement.parentNode) {
+                    statusElement.remove();
+                }
+            }, 300);
         }
     }
     
@@ -429,64 +452,95 @@ class UIManager {
     loadFaviconWithFallback(imgElement, url) {
         if (!imgElement || !url) return;
         
-        // 异步加载，不阻止页面渲染
-        setTimeout(() => {
-            try {
-                const domain = new URL(url).hostname;
-                const apis = [
-                    `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
-                    `https://${domain}/favicon.ico`
-                ];
-                
-                let currentApiIndex = 0;
-                let loadTimeout;
-                
-                const setDefaultIcon = () => {
-                    imgElement.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="16" height="16"%3E%3Crect width="16" height="16" fill="%23ddd"/%3E%3C/svg%3E';
-                    imgElement.classList.add('favicon-loaded');
-                };
-                
-                const tryNextApi = () => {
-                    // 清除之前的超时
-                    if (loadTimeout) {
+        try {
+            const domain = new URL(url).hostname;
+            
+            // 检查缓存
+            if (this.faviconCache.has(domain)) {
+                const cachedFavicon = this.faviconCache.get(domain);
+                imgElement.src = cachedFavicon;
+                imgElement.classList.add('favicon-loaded');
+                return;
+            }
+            
+            // 异步加载，不阻止页面渲染
+            setTimeout(() => {
+                try {
+                    // 多个favicon源，按优先级尝试
+                    const faviconSources = [
+                        `https://${domain}/favicon.ico`,
+                        `https://${domain}/favicon.png`,
+                        `https://${domain}/apple-touch-icon.png`
+                    ];
+                    
+                    let loadTimeout;
+                    let currentSourceIndex = 0;
+                    let isCompleted = false;
+                    
+                    const setDefaultIcon = () => {
+                        if (isCompleted) return;
+                        isCompleted = true;
                         clearTimeout(loadTimeout);
-                    }
-                    
-                    if (currentApiIndex >= apis.length) {
-                        // 所有API都失败，使用默认图标
-                        setDefaultIcon();
-                        return;
-                    }
-                    
-                    // 设置加载超时（2秒，避免长时间等待）
-                     loadTimeout = setTimeout(() => {
-                         currentApiIndex++;
-                         tryNextApi();
-                     }, 2000);
-                    
-                    const testImg = new Image();
-                    testImg.onload = () => {
-                        clearTimeout(loadTimeout);
-                        imgElement.src = apis[currentApiIndex];
+                        // 使用本站的favicon.svg作为默认图标
+                        const defaultIcon = '/favicon-simple.svg';
+                        this.faviconCache.set(domain, defaultIcon);
+                        imgElement.src = defaultIcon;
                         imgElement.classList.add('favicon-loaded');
                     };
-                    testImg.onerror = () => {
-                        clearTimeout(loadTimeout);
-                        currentApiIndex++;
-                        tryNextApi();
+                    
+                    const tryNextSource = () => {
+                        if (isCompleted) return;
+                        
+                        if (currentSourceIndex >= faviconSources.length) {
+                            // 所有源都尝试失败，使用默认图标
+                            setDefaultIcon();
+                            return;
+                        }
+                        
+                        const faviconUrl = faviconSources[currentSourceIndex];
+                        currentSourceIndex++;
+                        
+                        const testImg = new Image();
+                        testImg.onload = () => {
+                            if (isCompleted) return;
+                            isCompleted = true;
+                            clearTimeout(loadTimeout);
+                            // 缓存成功的favicon
+                            this.faviconCache.set(domain, faviconUrl);
+                            imgElement.src = faviconUrl;
+                            imgElement.classList.add('favicon-loaded');
+                        };
+                        testImg.onerror = () => {
+                            // 尝试下一个源
+                            setTimeout(tryNextSource, 100); // 添加小延迟避免过快请求
+                        };
+                        testImg.src = faviconUrl;
                     };
-                    testImg.src = apis[currentApiIndex];
-                };
-                
-                // 开始尝试加载
-                tryNextApi();
-                
-            } catch (error) {
-                console.warn('Favicon加载失败:', error);
-                imgElement.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="16" height="16"%3E%3Crect width="16" height="16" fill="%23ddd"/%3E%3C/svg%3E';
-                imgElement.classList.add('favicon-loaded');
-            }
-        }, 0); // 异步执行，不阻止页面渲染
+                    
+                    // 设置加载超时（5秒，避免长时间等待）
+                    loadTimeout = setTimeout(() => {
+                        setDefaultIcon();
+                    }, 5000);
+                    
+                    // 开始尝试第一个源
+                    tryNextSource();
+                    
+                } catch (error) {
+                    // 静默处理favicon加载失败
+                    // 使用本站的favicon.svg作为默认图标
+                    const defaultIcon = '/favicon-simple.svg';
+                    this.faviconCache.set(domain, defaultIcon);
+                    imgElement.src = defaultIcon;
+                    imgElement.classList.add('favicon-loaded');
+                }
+            }, 0); // 异步执行，不阻止页面渲染
+            
+        } catch (error) {
+            // 静默处理favicon加载失败
+            // 使用本站的favicon.svg作为默认图标
+            imgElement.src = '/favicon-simple.svg';
+            imgElement.classList.add('favicon-loaded');
+        }
     }
 
     // 切换移动端菜单
@@ -507,10 +561,12 @@ class UIManager {
         }
     }
     
-    // 更新分类计数
     // 更新分类菜单
     updateCategoryMenu(allBookmarks, currentCategory) {
-        if (!this.elements.categoryMenu) return;
+        if (!this.elements.categoryMenu) {
+            console.error('categoryMenu元素不存在');
+            return;
+        }
         
         // 获取所有分类
         const categories = new Set();
@@ -527,154 +583,191 @@ class UIManager {
             <li class="menu-item ${currentCategory === 'all' ? 'active' : ''}" data-category="all">
                 <i class="fas fa-home"></i>
                 <span>全部</span>
-                <span class="item-count">${allBookmarks.length}</span>
             </li>
         `;
         
         sortedCategories.forEach(category => {
-            const count = allBookmarks.filter(bookmark => bookmark.category === category).length;
             categoryMenuHtml += `
                 <li class="menu-item ${currentCategory === category ? 'active' : ''}" data-category="${category}">
                     <i class="fas fa-folder"></i>
                     <span>${category}</span>
-                    <span class="item-count">${count}</span>
                 </li>
             `;
         });
         
+        // 保存当前滚动位置
+        const scrollTop = this.elements.categoryMenu.scrollTop;
+        
         this.elements.categoryMenu.innerHTML = categoryMenuHtml;
-    }
-
-    updateCategoryCounts() {
-        // 获取所有分类元素并隐藏计数显示
-        const categoryElements = document.querySelectorAll('[data-category]');
         
-        // 隐藏所有计数显示
-        categoryElements.forEach(element => {
-            const countElement = element.querySelector('.item-count');
-            if (countElement) {
-                countElement.textContent = '';
-            }
-        });
+        // 恢复滚动位置
+        this.elements.categoryMenu.scrollTop = scrollTop;
     }
 
-    // 初始化事件监听器
-    initEventListeners() {
-        // 搜索功能
-        if (this.elements.searchInput) {
-            this.elements.searchInput.addEventListener('input', this.debounce((e) => {
-                if (this.filterBookmarks) {
-                    this.filterBookmarks(e.target.value);
-                }
-            }, 300));
+    // 网络诊断
+    async performNetworkDiagnosis() {
+        const results = {
+            browserOnline: navigator.onLine,
+            timestamp: new Date().toISOString(),
+            tests: []
+        };
+
+        // 测试1: 基本网络连接
+        try {
+            const startTime = Date.now();
+            const response = await fetch('/api/health', { 
+                method: 'GET',
+                cache: 'no-cache'
+            });
+            const endTime = Date.now();
             
-            // 清除按钮功能
-            const clearBtn = document.querySelector('.search-clear');
-            if (clearBtn) {
-                clearBtn.addEventListener('click', () => {
-                    this.elements.searchInput.value = '';
-                    if (this.filterBookmarks) {
-                        this.filterBookmarks('');
-                    }
-                    this.elements.searchInput.focus();
-                });
-            }
-        }
-        
-        // 分类切换和二级分类支持
-        const categoryItems = document.querySelectorAll('.menu-item[data-category]');
-        categoryItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                const category = item.dataset.category;
-                this.switchCategory(category);
+            results.tests.push({
+                name: '本地服务器连接',
+                success: response.ok,
+                latency: endTime - startTime,
+                status: response.status,
+                error: response.ok ? null : `HTTP ${response.status}`
             });
-        });
+        } catch (error) {
+            results.tests.push({
+                name: '本地服务器连接',
+                success: false,
+                latency: null,
+                status: null,
+                error: error.message
+            });
+        }
+
+        // 测试2: Notion API 连接
+        try {
+            const startTime = Date.now();
+            const response = await fetch('/api/bookmarks', { 
+                method: 'GET',
+                cache: 'no-cache'
+            });
+            const endTime = Date.now();
+            
+            results.tests.push({
+                name: 'Notion API 连接',
+                success: response.ok,
+                latency: endTime - startTime,
+                status: response.status,
+                error: response.ok ? null : `HTTP ${response.status}`
+            });
+        } catch (error) {
+            results.tests.push({
+                name: 'Notion API 连接',
+                success: false,
+                latency: null,
+                status: null,
+                error: error.message
+            });
+        }
+
+
+
+        return results;
+    }
+
+    // 显示网络诊断结果
+    showNetworkDiagnosis(results) {
+        const modal = document.getElementById('bookmarkModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+
+        if (!modal || !modalTitle || !modalBody) return;
+
+        modalTitle.textContent = '网络诊断结果';
         
-        // 二级分类切换按钮
-        const categoryToggles = document.querySelectorAll('.category-toggle');
-        categoryToggles.forEach(toggle => {
-            toggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const parentItem = toggle.closest('.category-parent');
-                const submenu = parentItem.querySelector('.submenu');
-                const isExpanded = parentItem.classList.contains('expanded');
+        const successCount = results.tests.filter(test => test.success).length;
+        const totalCount = results.tests.length;
+        
+        modalBody.innerHTML = `
+            <div class="diagnosis-summary">
+                <div class="diagnosis-header">
+                    <h3>诊断概览</h3>
+                    <div class="diagnosis-status ${successCount === totalCount ? 'success' : 'warning'}">
+                        <i class="fas fa-${successCount === totalCount ? 'check-circle' : 'exclamation-triangle'}"></i>
+                        <span>${successCount}/${totalCount} 项测试通过</span>
+                    </div>
+                </div>
                 
-                if (isExpanded) {
-                    parentItem.classList.remove('expanded');
-                    submenu.style.maxHeight = '0';
-                } else {
-                    parentItem.classList.add('expanded');
-                    submenu.style.maxHeight = submenu.scrollHeight + 'px';
-                }
-            });
-        });
-        
-        // 子分类点击
-        const submenuItems = document.querySelectorAll('.submenu-item');
-        submenuItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                const category = item.dataset.category;
-                this.switchCategory(category);
-            });
-        });
-        
-        // 移动端菜单切换
-        if (this.elements.menuToggle) {
-            this.elements.menuToggle.addEventListener('click', () => {
-                this.toggleMobileMenu();
-            });
-        }
-        
-        if (this.elements.sidebarOverlay) {
-            this.elements.sidebarOverlay.addEventListener('click', () => {
-                this.closeMobileMenu();
-            });
-        }
-        
-        // 模态框关闭
-        if (this.elements.modalClose) {
-            this.elements.modalClose.addEventListener('click', () => {
-                this.closeModal();
-            });
-        }
-        
-        // 点击模态框背景关闭
-        if (this.elements.modal) {
-            this.elements.modal.addEventListener('click', (e) => {
-                if (e.target === this.elements.modal) {
-                    this.closeModal();
-                }
-            });
-        }
-        
-        // ESC键关闭模态框
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.elements.modal.style.display === 'flex') {
-                this.closeModal();
-            }
-        });
+                <div class="diagnosis-details">
+                    <div class="diagnosis-item">
+                        <strong>浏览器网络状态:</strong>
+                        <span class="${results.browserOnline ? 'success' : 'error'}">
+                            <i class="fas fa-${results.browserOnline ? 'wifi' : 'wifi-slash'}"></i>
+                            ${results.browserOnline ? '在线' : '离线'}
+                        </span>
+                    </div>
+                    <div class="diagnosis-item">
+                        <strong>诊断时间:</strong>
+                        <span>${new Date(results.timestamp).toLocaleString()}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="diagnosis-tests">
+                <h4>详细测试结果</h4>
+                ${results.tests.map(test => `
+                    <div class="test-item ${test.success ? 'success' : 'error'}">
+                        <div class="test-header">
+                            <span class="test-name">${test.name}</span>
+                            <span class="test-status">
+                                <i class="fas fa-${test.success ? 'check' : 'times'}"></i>
+                                ${test.success ? '通过' : '失败'}
+                            </span>
+                        </div>
+                        <div class="test-details">
+                            ${test.latency ? `<span>延迟: ${test.latency}ms</span>` : ''}
+                            ${test.status ? `<span>状态: ${test.status}</span>` : ''}
+                            ${test.error ? `<span class="error">错误: ${test.error}</span>` : ''}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <div class="diagnosis-actions">
+                <button class="diagnosis-retry" onclick="window.bookmarkApp.uiManager.performNetworkDiagnosis().then(results => window.bookmarkApp.uiManager.showNetworkDiagnosis(results))">
+                    <i class="fas fa-redo"></i>
+                    重新诊断
+                </button>
+                <button class="diagnosis-close" onclick="window.bookmarkApp.uiManager.closeModal()">
+                    <i class="fas fa-times"></i>
+                    关闭
+                </button>
+            </div>
+        `;
+
+        modal.classList.add('show');
     }
     
     // 绑定书签事件
     bindBookmarkEvents() {
-        // 这个方法用于绑定书签卡片的事件
-        // 由于事件处理已经通过事件委托在EventManager中处理
-        // 这里保持空实现以避免错误
-    }
-    
-    // 防抖函数
-    debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
+        // 为所有书签卡片添加点击事件（包括分组中的卡片）
+        const cards = this.elements.bookmarksGrid.querySelectorAll('.bookmark-card');
+        cards.forEach(card => {
+            card.addEventListener('click', (e) => {
+                // 如果点击的是快速访问按钮，不显示详情
+                if (e.target.closest('.bookmark-quick-access')) {
+                    return;
+                }
+                
+                const bookmarkId = card.dataset.id;
+                if (bookmarkId && this.showBookmarkDetails) {
+                    // 这里需要从数据管理器获取书签详情
+                    // 暂时使用卡片数据
+                    const bookmarkData = {
+                        id: bookmarkId,
+                        title: card.querySelector('.bookmark-title')?.textContent || '无标题',
+                        url: card.querySelector('.bookmark-quick-access')?.dataset.url || '#',
+                        description: card.querySelector('.bookmark-description')?.textContent || '暂无描述',
+                        tags: Array.from(card.querySelectorAll('.tag')).map(tag => tag.textContent)
+                    };
+                    this.showBookmarkDetails(bookmarkData);
+                }
+            });
+        });
     }
 }
 

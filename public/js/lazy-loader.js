@@ -126,10 +126,9 @@ class LazyLoader {
 
     // 设置错误占位图
     setErrorPlaceholder(img) {
-        // 创建SVG占位图
-        const placeholder = this.createErrorPlaceholder();
-        img.src = placeholder;
-        img.alt = '图片加载失败';
+        // 使用本站的favicon.svg作为错误占位符
+        img.src = '/favicon-simple.svg';
+        img.alt = '图标加载失败';
     }
 
     // 创建错误占位图SVG
@@ -307,13 +306,20 @@ function addLazyLoadingToBookmark(bookmarkElement, bookmark) {
     // 为网站图标添加懒加载
     const favicon = bookmarkElement.querySelector('.bookmark-favicon');
     if (favicon && bookmark.url) {
-        const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}&sz=32`;
-        favicon.setAttribute('data-src', faviconUrl);
-        favicon.removeAttribute('src');
-        
-        // 添加加载占位符
-        favicon.style.backgroundColor = '#f8f9fa';
-        favicon.style.border = '1px solid #dee2e6';
+        try {
+            const domain = new URL(bookmark.url).hostname;
+            const faviconUrl = `https://${domain}/favicon.ico`;
+            favicon.setAttribute('data-src', faviconUrl);
+            favicon.removeAttribute('src');
+            
+            // 添加加载占位符
+            favicon.style.backgroundColor = '#f8f9fa';
+            favicon.style.border = '1px solid #dee2e6';
+        } catch (error) {
+            // 如果URL解析失败，使用本站favicon
+            favicon.setAttribute('data-src', '/favicon-simple.svg');
+            favicon.removeAttribute('src');
+        }
     }
     
     // 为整个书签卡片添加懒加载动画

@@ -31,6 +31,8 @@ class EventManager {
             return;
         }
         
+        // 设置事件监听器
+        
         // 搜索输入事件（防抖）
         if (this.uiManager.elements.searchInput) {
             this.uiManager.elements.searchInput.addEventListener('input', (e) => {
@@ -38,17 +40,26 @@ class EventManager {
             });
         }
 
-        // 分类菜单点击事件
+        // 分类菜单点击事件（使用事件委托）
         if (this.uiManager.elements.categoryMenu) {
             this.uiManager.elements.categoryMenu.addEventListener('click', (e) => {
                 this.handleCategoryClick(e);
             });
+        } else {
+            console.error('categoryMenu元素不存在！');
         }
 
-        // 标签菜单点击事件
-        if (this.uiManager.elements.tagMenu) {
-            this.uiManager.elements.tagMenu.addEventListener('click', (e) => {
-                this.handleTagClick(e);
+        // 标签筛选栏点击事件
+        if (this.uiManager.elements.tagsFilterContent) {
+            this.uiManager.elements.tagsFilterContent.addEventListener('click', (e) => {
+                this.handleFilterTagClick(e);
+            });
+        }
+
+        // 清除标签按钮点击事件
+        if (this.uiManager.elements.clearTagsBtn) {
+            this.uiManager.elements.clearTagsBtn.addEventListener('click', () => {
+                this.handleClearTags();
             });
         }
 
@@ -63,6 +74,25 @@ class EventManager {
         if (this.uiManager.elements.syncBtn) {
             this.uiManager.elements.syncBtn.addEventListener('click', () => {
                 this.handleSyncData();
+            });
+        }
+
+        // 网络诊断按钮点击事件
+        if (this.uiManager.elements.diagnoseBtn) {
+            this.uiManager.elements.diagnoseBtn.addEventListener('click', async () => {
+                try {
+                    this.uiManager.elements.diagnoseBtn.disabled = true;
+                    this.uiManager.elements.diagnoseBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    
+                    const results = await this.uiManager.performNetworkDiagnosis();
+                    this.uiManager.showNetworkDiagnosis(results);
+                } catch (error) {
+                    console.error('网络诊断失败:', error);
+                    this.uiManager.showMessage('网络诊断失败，请稍后重试', 'error');
+                } finally {
+                    this.uiManager.elements.diagnoseBtn.disabled = false;
+                    this.uiManager.elements.diagnoseBtn.innerHTML = '<i class="fas fa-network-wired"></i>';
+                }
             });
         }
 
@@ -123,6 +153,27 @@ class EventManager {
                 }, 16); // 约60fps
             }
         });
+
+        // 网络状态监听
+        this.setupNetworkListeners();
+
+        // 设置下拉刷新（移动端）
+        this.setupPullToRefresh();
+    }
+
+    // 设置网络状态监听
+    setupNetworkListeners() {
+        window.addEventListener('online', () => {
+            const status = this.apiService.checkNetworkStatus();
+            this.uiManager.showNetworkStatus(status);
+            this.uiManager.showMessage('网络连接已恢复', 'success', 3000);
+        });
+
+        window.addEventListener('offline', () => {
+            const status = this.apiService.checkNetworkStatus();
+            this.uiManager.showNetworkStatus(status);
+            this.uiManager.showMessage('网络连接已断开，请检查网络设置', 'warning', 0);
+        });
     }
 
     // 处理搜索（防抖）
@@ -136,49 +187,70 @@ class EventManager {
 
     // 处理分类点击
     handleCategoryClick(e) {
-        const menuItem = e.target.closest('.menu-item');
-        if (!menuItem || !menuItem.dataset.category) return;
-
-        // 更新选中状态
-        this.uiManager.elements.categoryMenu.querySelectorAll('.menu-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        menuItem.classList.add('active');
-
-        // 更新数据和UI
-        this.dataManager.setCategory(menuItem.dataset.category);
-        this.updateUI();
-
-        // 移动端自动关闭菜单
-        if (window.innerWidth <= 768) {
-            this.uiManager.closeMobileMenu();
+        // 更精确的事件目标查找
+        let categoryItem = e.target.closest('.menu-item[data-category]');
+        
+        // 如果没找到，尝试查找父元素
+        if (!categoryItem) {
+            categoryItem = e.target.closest('li[data-category]');
         }
-    }
-
-    // 处理标签点击
-    handleTagClick(e) {
-        const tagItem = e.target.closest('.tag-item');
-        const clearTags = e.target.closest('#clearTags');
-
-        if (clearTags) {
-            this.dataManager.clearTags();
-            this.updateUI();
+        
+        // 如果还是没找到，检查点击的元素本身
+        if (!categoryItem && e.target.classList.contains('menu-item')) {
+            categoryItem = e.target;
+        }
+        
+        if (!categoryItem) {
             return;
         }
-
-        if (!tagItem || !tagItem.dataset.tag) return;
-
-        const tag = tagItem.dataset.tag;
-        const isSelected = tagItem.classList.contains('selected');
-
-        if (isSelected) {
-            this.dataManager.removeTag(tag);
-            tagItem.classList.remove('selected');
-        } else {
-            this.dataManager.addTag(tag);
-            tagItem.classList.add('selected');
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const category = categoryItem.dataset.category;
+        
+        if (!category) {
+            console.error('分类项的data-category属性为空');
+            return;
         }
+        
+        // 移除所有active类
+        const allMenuItems = this.uiManager.elements.categoryMenu.querySelectorAll('.menu-item');
+        allMenuItems.forEach(item => item.classList.remove('active'));
+        
+        // 添加active类到当前项
+        categoryItem.classList.add('active');
+        
+        // 切换分类
+        this.dataManager.setCategory(category);
+        
+        // 更新UI
+        this.updateUI();
+    }
 
+    // 处理标签筛选栏点击
+    handleFilterTagClick(e) {
+        const filterTag = e.target.closest('.filter-tag');
+        if (!filterTag) return;
+        
+        e.preventDefault();
+        
+        const tag = filterTag.dataset.tag;
+        if (!tag) return;
+        
+        // 切换标签选择状态
+        this.dataManager.toggleTag(tag);
+        
+        // 更新UI
+        this.updateUI();
+    }
+
+    // 处理清除标签
+    handleClearTags() {
+        // 清除所有选中的标签
+        this.dataManager.clearTags();
+        
+        // 更新UI
         this.updateUI();
     }
 
@@ -239,31 +311,56 @@ class EventManager {
 
     // 处理同步数据
     async handleSyncData() {
-        const syncBtn = this.uiManager.elements.syncBtn;
-        const originalHTML = syncBtn.innerHTML;
-        
         try {
+            // 检查网络状态
+            const networkStatus = this.apiService.checkNetworkStatus();
+            if (!networkStatus.isOnline) {
+                this.uiManager.showMessage('网络连接已断开，请检查网络设置', 'warning');
+                return;
+            }
+
             // 显示加载状态
-            syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            syncBtn.disabled = true;
-            
-            // 获取新数据
-            const bookmarks = await this.apiService.getBookmarks();
-            this.dataManager.setBookmarks(bookmarks);
-            
-            // 更新UI
-            this.updateUI();
+            this.uiManager.elements.syncBtn.disabled = true;
+            const originalText = this.uiManager.elements.syncBtn.innerHTML;
+            this.uiManager.elements.syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            // 测试网络连接
+            const connectionTest = await this.apiService.testConnection();
+            if (!connectionTest.success) {
+                this.uiManager.showMessage(`网络连接测试失败: ${connectionTest.error}`, 'error');
+                return;
+            }
+
+            // 重新加载数据
+            await this.app.reload();
             
             // 显示成功消息
-            this.uiManager.showMessage('数据同步成功！', 'success');
+            this.uiManager.showMessage('数据刷新成功！', 'success');
             
         } catch (error) {
-            console.error('同步失败:', error);
-            this.uiManager.showMessage('同步失败，请检查网络连接', 'error');
+            console.error('同步数据失败:', error);
+            
+            // 根据错误类型显示不同消息
+            let message = '数据刷新失败，请稍后重试';
+            let type = 'error';
+            
+            if (error.type === 'timeout') {
+                message = '请求超时，请检查网络连接';
+                type = 'warning';
+            } else if (error.type === 'network') {
+                message = '网络连接异常，请检查网络设置';
+                type = 'warning';
+            } else if (error.type === 'server') {
+                message = '服务器暂时不可用，请稍后重试';
+                type = 'warning';
+            }
+            
+            this.uiManager.showMessage(message, type);
+            
         } finally {
             // 恢复按钮状态
-            syncBtn.innerHTML = originalHTML;
-            syncBtn.disabled = false;
+            this.uiManager.elements.syncBtn.disabled = false;
+            this.uiManager.elements.syncBtn.innerHTML = '<i class="fas fa-sync-alt"></i><span class="sync-text">刷新</span>';
         }
     }
 
@@ -448,15 +545,6 @@ class EventManager {
                 this.dataManager.getCurrentTags()
             );
             
-            // 更新结果统计
-            this.uiManager.updateResultsCount(
-                filteredBookmarks.length,
-                this.dataManager.getAllBookmarks().length
-            );
-            
-            // 更新分类计数
-            this.uiManager.updateCategoryCounts();
-            
         } catch (error) {
             console.error('❌ EventManager.updateUI 执行失败:', error);
             console.error('错误堆栈:', error.stack);
@@ -602,6 +690,8 @@ class EventManager {
         this.pullToRefresh.startY = 0;
         this.pullToRefresh.currentY = 0;
     }
+
+
 
     // 销毁事件监听器（清理方法）
     destroy() {

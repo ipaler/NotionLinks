@@ -40,10 +40,17 @@ app.get('/api/config', (req, res) => {
 
 // API 路由：获取书签数据
 app.get('/api/bookmarks', async (req, res) => {
+    const startTime = Date.now();
+    
     try {
-        // 调用 Notion API 获取数据，增加超时配置// 创建AbortController用于超时控制
+        console.log('📡 开始获取书签数据...');
+        
+        // 创建AbortController用于超时控制
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+            console.log('⏰ 请求超时，已取消');
+        }, 30000); // 30秒超时
         
         const response = await fetch(`https://api.notion.com/v1/databases/${NOTION_CONFIG.databaseId}/query`, {
             method: 'POST',
@@ -59,14 +66,30 @@ app.get('/api/bookmarks', async (req, res) => {
         });
         
         clearTimeout(timeoutId);
+        const responseTime = Date.now() - startTime;
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.log('Notion API 错误详情:', errorText);
-            throw new Error(`Notion API 错误: ${response.status} ${response.statusText} - ${errorText}`);
+            console.error(`❌ Notion API 错误 (${response.status}):`, errorText);
+            
+            // 根据HTTP状态码分类错误
+            if (response.status === 401) {
+                throw new Error('Notion API 密钥无效或已过期');
+            } else if (response.status === 403) {
+                throw new Error('没有访问 Notion 数据库的权限');
+            } else if (response.status === 404) {
+                throw new Error('Notion 数据库不存在或ID错误');
+            } else if (response.status === 429) {
+                throw new Error('Notion API 请求频率超限，请稍后重试');
+            } else if (response.status >= 500) {
+                throw new Error('Notion 服务器暂时不可用，请稍后重试');
+            } else {
+                throw new Error(`Notion API 错误: ${response.status} ${response.statusText}`);
+            }
         }
 
         const data = await response.json();
+        console.log(`✅ 成功获取书签数据 (${responseTime}ms, ${data.results?.length || 0} 条记录)`);
         
         // 处理数据格式
         const bookmarks = data.results.map(page => {
@@ -78,7 +101,7 @@ app.get('/api/bookmarks', async (req, res) => {
                 description: properties.Description?.rich_text?.[0]?.plain_text || properties.描述?.rich_text?.[0]?.plain_text || '',
                 category: properties.Category?.select?.name || properties.分类?.select?.name || '未分类',
                 tags: properties.Tags?.multi_select?.map(tag => tag.name) || properties.标签?.multi_select?.map(tag => tag.name) || [],
-                favicon: `https://www.google.com/s2/favicons?domain=${new URL(properties.URL?.url || properties.链接?.url || 'https://example.com').hostname}&sz=32`,
+                favicon: getFaviconUrl(properties.URL?.url || properties.链接?.url || ''),
                 createdTime: page.created_time,
                 lastEditedTime: page.last_edited_time
             };
@@ -87,31 +110,66 @@ app.get('/api/bookmarks', async (req, res) => {
         res.json({
             success: true,
             data: bookmarks,
-            count: bookmarks.length
+            count: bookmarks.length,
+            responseTime: responseTime
         });
         
     } catch (error) {
-            console.error('获取书签失败:', error);
-            
-            if (error.name === 'AbortError') {
-                res.status(408).json({
-                    success: false,
-                    error: '请求超时',
-                    message: '连接Notion API超时，请检查网络连接或增加超时时间'
-                });
-            } else {
-                res.status(500).json({
-                    success: false,
-                    error: '获取书签数据失败',
-                    message: error.message || '未知错误',
-                    details: {
-                        type: error.type,
-                        code: error.code,
-                        errno: error.errno
-                    }
-                });
-            }
+        const responseTime = Date.now() - startTime;
+        console.error(`❌ 获取书签失败 (${responseTime}ms):`, error.message);
+        
+        // 根据错误类型返回不同的响应
+        if (error.name === 'AbortError') {
+            res.status(408).json({
+                success: false,
+                error: 'REQUEST_TIMEOUT',
+                message: '请求超时，请检查网络连接或稍后重试',
+                responseTime: responseTime
+            });
+        } else if (error.message.includes('fetch')) {
+            res.status(503).json({
+                success: false,
+                error: 'NETWORK_ERROR',
+                message: '网络连接失败，请检查网络设置',
+                responseTime: responseTime
+            });
+        } else if (error.message.includes('Notion API 密钥')) {
+            res.status(401).json({
+                success: false,
+                error: 'INVALID_TOKEN',
+                message: 'Notion API 密钥无效，请检查配置',
+                responseTime: responseTime
+            });
+        } else if (error.message.includes('权限')) {
+            res.status(403).json({
+                success: false,
+                error: 'PERMISSION_DENIED',
+                message: '没有访问权限，请检查数据库权限设置',
+                responseTime: responseTime
+            });
+        } else if (error.message.includes('数据库不存在')) {
+            res.status(404).json({
+                success: false,
+                error: 'DATABASE_NOT_FOUND',
+                message: '数据库不存在或ID错误，请检查配置',
+                responseTime: responseTime
+            });
+        } else if (error.message.includes('频率超限')) {
+            res.status(429).json({
+                success: false,
+                error: 'RATE_LIMITED',
+                message: '请求频率超限，请稍后重试',
+                responseTime: responseTime
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: 'SERVER_ERROR',
+                message: error.message || '服务器内部错误',
+                responseTime: responseTime
+            });
         }
+    }
 });
 
 
@@ -171,13 +229,8 @@ function getFaviconUrl(url) {
     if (!url) return '';
     try {
         const domain = new URL(url).hostname;
-        // 只使用Google和原站点的API
-        const apis = [
-            `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
-            `https://${domain}/favicon.ico`
-        ];
-        return apis[0]; // 默认使用第一个API
-    } catch {
+        return `https://${domain}/favicon.ico`;
+    } catch (error) {
         return '';
     }
 }

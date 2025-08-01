@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NotionLinks</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="favicon-simple.svg">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="apple-touch-icon" href="favicon-simple.svg">
+    
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -19,19 +25,16 @@
             </div>
             
             <div class="header-center">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="搜索书签...">
-                    <button class="search-clear" id="searchClear" style="display: none;">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
+                <!-- 搜索框已移动到主内容区 -->
             </div>
             
             <div class="header-right">
                 <button class="sync-btn" id="syncBtn" title="刷新数据">
                     <i class="fas fa-sync-alt"></i>
                     <span class="sync-text">刷新</span>
+                </button>
+                <button class="diagnose-btn" id="diagnoseBtn" title="网络诊断">
+                    <i class="fas fa-network-wired"></i>
                 </button>
                 <button class="menu-toggle" id="menuToggle">
                     <i class="fas fa-bars"></i>
@@ -48,22 +51,13 @@
         <aside class="sidebar" id="sidebar">
             <nav class="nav-menu">
                 <div class="menu-section">
-                    <h3>📂 分类</h3>
                     <ul class="menu-list" id="categoryMenu">
                         <li class="menu-item active" data-category="all">
                             <i class="fas fa-home"></i>
                             <span>全部</span>
-                            <span class="item-count">0</span>
                         </li>
                         
                         <!-- 动态生成的分类将在这里显示 -->
-                    </ul>
-                </div>
-                
-                <div class="menu-section">
-                    <h3>🏷️ 标签</h3>
-                    <ul class="menu-list" id="tagMenu">
-                        <!-- 动态生成标签 -->
                     </ul>
                 </div>
             </nav>
@@ -71,10 +65,31 @@
 
         <!-- 主内容区域 -->
         <main class="main-content">
-            <div class="content-header">
-                <h1 id="pageTitle">全部书签</h1>
-                <div class="content-stats">
-                    <span class="results-count" id="resultsCount">0 个书签</span>
+            <!-- 标签筛选栏 -->
+            <div class="tags-filter-bar" id="tagsFilterBar">
+                <div class="tags-filter-header">
+                    <h3>🏷️ 标签筛选</h3>
+                    <button class="clear-tags-btn" id="clearTagsBtn" style="display: none;">
+                        <i class="fas fa-times"></i>
+                        清除选择
+                    </button>
+                </div>
+                <div class="tags-filter-content" id="tagsFilterContent">
+                    <!-- 动态生成的标签将在这里显示 -->
+                </div>
+            </div>
+
+            <!-- 页面标题和搜索框 -->
+            <div class="page-header">
+                <div class="page-title-section">
+                    <h1 id="pageTitle">全部书签</h1>
+                </div>
+                <div class="search-box" id="searchBox">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="搜索书签...">
+                    <button class="search-clear" id="searchClear" style="display: none;">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
             </div>
 
@@ -139,6 +154,7 @@
                 window.bookmarkApp = new BookmarkApp();
                 window.bookmarkApp.init().then(() => {
                     // 应用初始化成功
+                    console.log('应用初始化成功');
                 }).catch(error => {
                     console.error('应用初始化失败:', error);
                 });

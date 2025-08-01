@@ -31,6 +31,11 @@ class DataManager {
     // 设置当前分类
     setCategory(category) {
         this.currentCategory = category;
+        
+        // 清除缓存，确保重新过滤
+        this.clearCache();
+        
+        // 重新过滤书签
         this.filterBookmarks();
     }
 
@@ -57,6 +62,15 @@ class DataManager {
     removeTag(tag) {
         this.currentTags = this.currentTags.filter(t => t !== tag);
         this.filterBookmarks();
+    }
+
+    // 切换标签选择状态
+    toggleTag(tag) {
+        if (this.currentTags.includes(tag)) {
+            this.removeTag(tag);
+        } else {
+            this.addTag(tag);
+        }
     }
 
     // 清除所有标签
@@ -96,15 +110,15 @@ class DataManager {
         }
 
         // 执行过滤
-        this.filteredBookmarks = this.allBookmarks.filter(bookmark => {
+        let filtered = this.allBookmarks.filter(bookmark => {
             // 分类过滤
             const categoryMatch = this.currentCategory === 'all' || 
                 bookmark.category === this.currentCategory;
             
-            // 标签过滤（支持多标签AND逻辑）
+            // 标签过滤（支持多标签OR逻辑）
             const tagMatch = this.currentTags.length === 0 || 
                 (bookmark.tags && bookmark.tags.length > 0 && 
-                 this.currentTags.every(tag => bookmark.tags.includes(tag)));
+                 this.currentTags.some(tag => bookmark.tags.includes(tag)));
             
             // 搜索过滤
             const searchMatch = !this.searchQuery || 
@@ -112,6 +126,18 @@ class DataManager {
             
             return categoryMatch && tagMatch && searchMatch;
         });
+
+        // 如果是"全部"分类，按分类分组
+        if (this.currentCategory === 'all') {
+            const grouped = this.groupBookmarksByCategory(filtered);
+            this.filteredBookmarks = grouped;
+        } else {
+            // 对于特定分类，也使用分组格式，但只有一个分组
+            this.filteredBookmarks = [{
+                category: this.currentCategory,
+                bookmarks: filtered
+            }];
+        }
 
         // 缓存结果
         this.cache.set(cacheKey, {
@@ -123,6 +149,34 @@ class DataManager {
         this.cleanExpiredCache();
 
         return this.filteredBookmarks;
+    }
+
+    // 按分类分组书签
+    groupBookmarksByCategory(bookmarks) {
+        const groups = {};
+        
+        // 初始化分组
+        groups['未分类'] = [];
+        
+        bookmarks.forEach(bookmark => {
+            const category = bookmark.category || '未分类';
+            if (!groups[category]) {
+                groups[category] = [];
+            }
+            groups[category].push(bookmark);
+        });
+
+        // 转换为数组格式，按分类名称排序
+        const sortedCategories = Object.keys(groups).sort((a, b) => {
+            if (a === '未分类') return 1;
+            if (b === '未分类') return -1;
+            return a.localeCompare(b, 'zh-CN');
+        });
+
+        return sortedCategories.map(category => ({
+            category: category,
+            bookmarks: groups[category]
+        }));
     }
 
     // 在书签中搜索
