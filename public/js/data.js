@@ -14,7 +14,8 @@ class DataManager {
 
     // 设置所有书签数据
     setBookmarks(bookmarks) {
-        this.allBookmarks = bookmarks;
+        console.log('设置书签数据:', bookmarks?.length || 0, '条记录');
+        this.allBookmarks = bookmarks || [];
         this.filterBookmarks();
     }
 
@@ -97,6 +98,13 @@ class DataManager {
 
     // 过滤书签（核心方法）
     filterBookmarks() {
+        console.log('开始过滤书签:', {
+            total: this.allBookmarks.length,
+            category: this.currentCategory,
+            tags: this.currentTags,
+            search: this.searchQuery
+        });
+        
         // 生成缓存键
         const cacheKey = `${this.currentCategory}_${this.currentTags.join(',')}_${this.searchQuery}`;
         
@@ -105,6 +113,7 @@ class DataManager {
             const cached = this.cache.get(cacheKey);
             if (Date.now() - cached.timestamp < this.cacheTimeout) {
                 this.filteredBookmarks = cached.data;
+                console.log('使用缓存结果:', this.filteredBookmarks.length, '个分组');
                 return this.filteredBookmarks;
             }
         }
@@ -127,6 +136,8 @@ class DataManager {
             return categoryMatch && tagMatch && searchMatch;
         });
 
+        console.log('过滤后书签数量:', filtered.length);
+
         // 如果是"全部"分类，按分类分组
         if (this.currentCategory === 'all') {
             const grouped = this.groupBookmarksByCategory(filtered);
@@ -138,6 +149,8 @@ class DataManager {
                 bookmarks: filtered
             }];
         }
+
+        console.log('分组后结果:', this.filteredBookmarks.length, '个分组');
 
         // 缓存结果
         this.cache.set(cacheKey, {
@@ -179,26 +192,56 @@ class DataManager {
         }));
     }
 
-    // 在书签中搜索
+    // 在书签中搜索（优化版本）
     searchInBookmark(bookmark, query) {
+        const searchQuery = query.toLowerCase();
+        
+        // 多词搜索优化
+        const queryWords = searchQuery.split(/\s+/).filter(word => word.length > 0);
+        
+        // 如果只有一个词，使用简单匹配
+        if (queryWords.length === 1) {
+            const searchFields = [
+                bookmark.title,
+                bookmark.description,
+                bookmark.url,
+                bookmark.category
+            ];
+
+            // 在基本字段中搜索
+            const basicMatch = searchFields.some(field => 
+                field && field.toLowerCase().includes(searchQuery)
+            );
+
+            // 在标签中搜索
+            const tagMatch = bookmark.tags && bookmark.tags.some(tag => 
+                tag.toLowerCase().includes(searchQuery)
+            );
+
+            return basicMatch || tagMatch;
+        }
+        
+        // 多词搜索：所有词都必须匹配（AND逻辑）
         const searchFields = [
             bookmark.title,
             bookmark.description,
             bookmark.url,
             bookmark.category
         ];
-
-        // 在基本字段中搜索
-        const basicMatch = searchFields.some(field => 
-            field && field.toLowerCase().includes(query)
-        );
-
-        // 在标签中搜索
-        const tagMatch = bookmark.tags && bookmark.tags.some(tag => 
-            tag.toLowerCase().includes(query)
-        );
-
-        return basicMatch || tagMatch;
+        
+        return queryWords.every(word => {
+            // 检查基本字段
+            const fieldMatch = searchFields.some(field => 
+                field && field.toLowerCase().includes(word)
+            );
+            
+            // 检查标签
+            const tagMatch = bookmark.tags && bookmark.tags.some(tag => 
+                tag.toLowerCase().includes(word)
+            );
+            
+            return fieldMatch || tagMatch;
+        });
     }
 
     // 获取所有分类

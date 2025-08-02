@@ -1,9 +1,31 @@
 // 事件管理模块 - 处理用户交互和事件监听
 class EventManager {
-    constructor(dataManager, uiManager, apiService) {
+    constructor(dataManager, uiManager, apiService, app) {
         this.dataManager = dataManager;
         this.uiManager = uiManager;
         this.apiService = apiService;
+        this.app = app;
+        
+        // 配置选项
+        this.config = {
+            clearFiltersOnCategoryChange: true, // 切换分类时是否清空筛选条件
+            showCategoryChangeMessage: true     // 是否显示分类切换提示消息
+        };
+        
+        // 常量配置
+        this.constants = {
+            SEARCH_DEBOUNCE_DELAY: 300,
+            RESIZE_DEBOUNCE_DELAY: 250,
+            SCROLL_THROTTLE_DELAY: 16,
+            SCROLL_TO_TOP_THRESHOLD: 300,
+            MOBILE_BREAKPOINT: 768,
+            TABLET_BREAKPOINT: 968,
+            CARD_MIN_WIDTH: {
+                DESKTOP: 320,
+                MOBILE: 280
+            },
+            GRID_GAP: 24
+        };
         
         // 防抖定时器
         this.searchDebounceTimer = null;
@@ -26,46 +48,66 @@ class EventManager {
     // 设置所有事件监听器
     setupEventListeners() {
         // 安全检查uiManager和elements
-        if (!this.uiManager || !this.uiManager.elements) {
+        if (!this.uiManager?.elements) {
             console.warn('EventManager: UIManager或elements未正确初始化');
             return;
         }
         
-        // 设置事件监听器
+        const { elements } = this.uiManager;
         
         // 搜索输入事件（防抖）
-        if (this.uiManager.elements.searchInput) {
-            this.uiManager.elements.searchInput.addEventListener('input', (e) => {
-                this.handleSearchDebounced(e.target.value);
+        if (elements.searchInput) {
+            elements.searchInput.addEventListener('input', (e) => {
+                this.handleSearchInput(e.target.value);
             });
+        }
+
+        // 搜索清除按钮点击事件
+        if (elements.searchClear) {
+            elements.searchClear.addEventListener('click', () => {
+                this.handleSearchClear();
+            });
+            
+            // 初始化时隐藏清除按钮
+            this.uiManager.toggleSearchClearButton(false);
         }
 
         // 分类菜单点击事件（使用事件委托）
-        if (this.uiManager.elements.categoryMenu) {
-            this.uiManager.elements.categoryMenu.addEventListener('click', (e) => {
+        if (elements.categoryMenu) {
+            elements.categoryMenu.addEventListener('click', (e) => {
                 this.handleCategoryClick(e);
             });
-        } else {
-            console.error('categoryMenu元素不存在！');
         }
 
         // 标签筛选栏点击事件
-        if (this.uiManager.elements.tagsFilterContent) {
-            this.uiManager.elements.tagsFilterContent.addEventListener('click', (e) => {
+        if (elements.tagsFilterContent) {
+            elements.tagsFilterContent.addEventListener('click', (e) => {
                 this.handleFilterTagClick(e);
             });
         }
 
+        // 展开标签按钮点击事件
+        if (elements.expandTagsBtn) {
+            elements.expandTagsBtn.addEventListener('click', () => {
+                this.handleToggleTagsExpansion();
+            });
+            
+            // 初始化时检查展开按钮状态
+            setTimeout(() => {
+                this.uiManager.checkTagsOverflow();
+            }, 200);
+        }
+
         // 清除标签按钮点击事件
-        if (this.uiManager.elements.clearTagsBtn) {
-            this.uiManager.elements.clearTagsBtn.addEventListener('click', () => {
+        if (elements.clearTagsBtn) {
+            elements.clearTagsBtn.addEventListener('click', () => {
                 this.handleClearTags();
             });
         }
 
         // 书签网格点击事件（事件委托）
-        if (this.uiManager.elements.bookmarksGrid) {
-            this.uiManager.elements.bookmarksGrid.addEventListener('click', (e) => {
+        if (elements.bookmarksGrid) {
+            elements.bookmarksGrid.addEventListener('click', (e) => {
                 this.handleBookmarkClick(e);
             });
         }
@@ -84,8 +126,14 @@ class EventManager {
                     this.uiManager.elements.diagnoseBtn.disabled = true;
                     this.uiManager.elements.diagnoseBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                     
+                    // 显示加载消息
+                    this.uiManager.showMessage('正在执行网络诊断...', 'info', 2000);
+                    
                     const results = await this.uiManager.performNetworkDiagnosis();
                     this.uiManager.showNetworkDiagnosis(results);
+                    
+                    // 显示成功消息
+                    this.uiManager.showMessage('网络诊断完成', 'success', 3000);
                 } catch (error) {
                     console.error('网络诊断失败:', error);
                     this.uiManager.showMessage('网络诊断失败，请稍后重试', 'error');
@@ -138,6 +186,16 @@ class EventManager {
             this.handleKeyboardEvents(e);
         });
 
+        // 清除键盘焦点样式
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.bookmark-card')) {
+                const focusedCards = document.querySelectorAll('.bookmark-card.keyboard-focused');
+                focusedCards.forEach(card => {
+                    card.classList.remove('keyboard-focused');
+                });
+            }
+        });
+
         // 窗口大小变化事件（防抖）
         window.addEventListener('resize', () => {
             this.handleResizeDebounced();
@@ -176,13 +234,61 @@ class EventManager {
         });
     }
 
-    // 处理搜索（防抖）
-    handleSearchDebounced(query) {
+    // 处理搜索（防抖 + 性能优化）
+    handleSearchInput(query) {
+        // 显示/隐藏清除按钮
+        this.uiManager.toggleSearchClearButton(query.length > 0);
+        
+        // 性能优化：如果查询为空，立即清除
+        if (!query.trim()) {
+            clearTimeout(this.searchDebounceTimer);
+            this.dataManager.setSearchQuery('');
+            this.updateUI();
+            return;
+        }
+        
+        // 防抖处理搜索
         clearTimeout(this.searchDebounceTimer);
         this.searchDebounceTimer = setTimeout(() => {
-            this.dataManager.setSearchQuery(query);
-            this.updateUI();
-        }, 300);
+            // 性能优化：避免重复搜索相同内容
+            if (this.dataManager.getSearchQuery() !== query) {
+                this.dataManager.setSearchQuery(query);
+                this.updateUI();
+            }
+        }, this.constants.SEARCH_DEBOUNCE_DELAY);
+    }
+
+    handleSearchClear() {
+        this.clearSearchInput();
+        
+        // 移动端优化：提供触觉反馈（如果支持）
+        if (navigator.vibrate && window.innerWidth <= this.constants.MOBILE_BREAKPOINT) {
+            navigator.vibrate(50);
+        }
+    }
+
+    // 清空搜索框
+    clearSearchInput() {
+        const { elements } = this.uiManager;
+        
+        // 清除搜索输入
+        if (elements.searchInput) {
+            elements.searchInput.value = '';
+            elements.searchInput.focus();
+            
+                    // 移动端优化：确保输入框获得焦点
+        if (window.innerWidth <= this.constants.MOBILE_BREAKPOINT) {
+            setTimeout(() => {
+                elements.searchInput.focus();
+            }, 100);
+        }
+        }
+        
+        // 隐藏清除按钮
+        this.uiManager.toggleSearchClearButton(false);
+        
+        // 清除搜索查询
+        this.dataManager.setSearchQuery('');
     }
 
     // 处理分类点击
@@ -221,11 +327,29 @@ class EventManager {
         // 添加active类到当前项
         categoryItem.classList.add('active');
         
+        // 根据配置决定是否清空筛选条件
+        if (this.config.clearFiltersOnCategoryChange) {
+            // 清空搜索框
+            this.clearSearchInput();
+            
+            // 清空标签筛选条件
+            this.clearTagFilters();
+        }
+        
         // 切换分类
         this.dataManager.setCategory(category);
         
         // 更新UI
         this.updateUI();
+        
+        // 根据配置决定是否显示提示消息
+        if (this.config.showCategoryChangeMessage) {
+            const categoryName = category === 'all' ? '全部' : category;
+            const message = this.config.clearFiltersOnCategoryChange 
+                ? `已切换到"${categoryName}"分类，并清空筛选条件`
+                : `已切换到"${categoryName}"分类`;
+            this.uiManager.showMessage(message, 'info', 2000);
+        }
     }
 
     // 处理标签筛选栏点击
@@ -247,11 +371,61 @@ class EventManager {
 
     // 处理清除标签
     handleClearTags() {
-        // 清除所有选中的标签
-        this.dataManager.clearTags();
+        this.clearTagFilters();
         
         // 更新UI
         this.updateUI();
+    }
+
+    // 清空标签筛选条件
+    clearTagFilters() {
+        const { elements } = this.uiManager;
+        
+        // 清除所有选中的标签
+        this.dataManager.clearTags();
+        
+        // 隐藏清除标签按钮
+        if (elements.clearTagsBtn) {
+            elements.clearTagsBtn.style.display = 'none';
+        }
+        
+        // 重置标签展开状态
+        if (elements.tagsFilterContent) {
+            elements.tagsFilterContent.classList.remove('expanded');
+        }
+        
+        // 更新展开按钮状态
+        if (elements.expandTagsBtn) {
+            elements.expandTagsBtn.classList.remove('expanded');
+            elements.expandTagsBtn.innerHTML = '<i class="fas fa-chevron-down"></i><span>展开</span>';
+        }
+    }
+
+    // 设置配置选项
+    setConfig(config) {
+        this.config = { ...this.config, ...config };
+    }
+
+    // 获取配置选项
+    getConfig() {
+        return { ...this.config };
+    }
+
+    handleToggleTagsExpansion() {
+        const content = this.uiManager.elements.tagsFilterContent;
+        const expandBtn = this.uiManager.elements.expandTagsBtn;
+        if (!content || !expandBtn) return;
+        
+        // 如果按钮被禁用，不执行操作
+        if (expandBtn.disabled) return;
+        
+        const isExpanded = content.classList.contains('expanded');
+        this.uiManager.toggleTagsExpansion(!isExpanded, true); // 标记为用户操作
+        
+        // 延迟检查是否需要显示展开按钮
+        setTimeout(() => {
+            this.uiManager.checkTagsOverflow();
+        }, 300);
     }
 
     // 处理书签点击
@@ -311,6 +485,18 @@ class EventManager {
 
     // 处理同步数据
     async handleSyncData() {
+        // 防止重复点击
+        if (this.uiManager.elements.syncBtn.disabled) {
+            return;
+        }
+
+        // 检查app实例是否存在
+        if (!this.app) {
+            console.error('App实例未找到');
+            this.uiManager.showMessage('应用未正确初始化，请刷新页面重试', 'error');
+            return;
+        }
+
         try {
             // 检查网络状态
             const networkStatus = this.apiService.checkNetworkStatus();
@@ -321,21 +507,16 @@ class EventManager {
 
             // 显示加载状态
             this.uiManager.elements.syncBtn.disabled = true;
-            const originalText = this.uiManager.elements.syncBtn.innerHTML;
             this.uiManager.elements.syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-            // 测试网络连接
-            const connectionTest = await this.apiService.testConnection();
-            if (!connectionTest.success) {
-                this.uiManager.showMessage(`网络连接测试失败: ${connectionTest.error}`, 'error');
-                return;
-            }
+            // 显示加载消息
+            this.uiManager.showMessage('正在刷新数据...', 'info', 2000);
 
             // 重新加载数据
             await this.app.reload();
             
             // 显示成功消息
-            this.uiManager.showMessage('数据刷新成功！', 'success');
+            this.uiManager.showMessage('数据刷新成功！', 'success', 3000);
             
         } catch (error) {
             console.error('同步数据失败:', error);
@@ -344,15 +525,39 @@ class EventManager {
             let message = '数据刷新失败，请稍后重试';
             let type = 'error';
             
-            if (error.type === 'timeout') {
+            if (error.name === 'AbortError' || error.message.includes('timeout')) {
                 message = '请求超时，请检查网络连接';
                 type = 'warning';
-            } else if (error.type === 'network') {
+            } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
                 message = '网络连接异常，请检查网络设置';
                 type = 'warning';
-            } else if (error.type === 'server') {
+            } else if (error.message.includes('HTTP 5')) {
                 message = '服务器暂时不可用，请稍后重试';
                 type = 'warning';
+            } else if (error.message.includes('HTTP 4')) {
+                message = '请求参数错误，请检查配置';
+                type = 'warning';
+            } else if (error.message.includes('Notion API')) {
+                message = 'Notion API 连接失败，请检查配置';
+                type = 'warning';
+            } else if (error.message.includes('网络连接失败')) {
+                message = '网络连接失败，请检查网络设置';
+                type = 'warning';
+            } else if (error.message.includes('Notion API 密钥无效')) {
+                message = 'Notion API 配置错误，请联系管理员';
+                type = 'error';
+            } else if (error.message.includes('没有访问权限')) {
+                message = '没有访问 Notion 数据库的权限';
+                type = 'error';
+            } else if (error.message.includes('数据库不存在')) {
+                message = 'Notion 数据库不存在或ID错误';
+                type = 'error';
+            } else if (error.message.includes('请求频率超限')) {
+                message = '请求过于频繁，请稍后重试';
+                type = 'warning';
+            } else {
+                message = `刷新失败: ${error.message}`;
+                type = 'error';
             }
             
             this.uiManager.showMessage(message, type);
@@ -360,17 +565,27 @@ class EventManager {
         } finally {
             // 恢复按钮状态
             this.uiManager.elements.syncBtn.disabled = false;
-            this.uiManager.elements.syncBtn.innerHTML = '<i class="fas fa-sync-alt"></i><span class="sync-text">刷新</span>';
+            this.uiManager.elements.syncBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
         }
     }
 
     // 处理键盘事件
     handleKeyboardEvents(e) {
-        // ESC 键关闭模态框
+        // ESC 键处理
         if (e.key === 'Escape') {
+            // 如果搜索框有内容，优先清除搜索
+            if (this.uiManager.elements.searchInput && this.uiManager.elements.searchInput.value.trim()) {
+                e.preventDefault();
+                this.handleSearchClear();
+                return;
+            }
+            
+            // 关闭模态框
             if (this.uiManager.elements.modal.style.display === 'flex') {
                 this.uiManager.closeModal();
             }
+            
+            // 关闭移动端菜单
             if (this.uiManager.elements.sidebar.classList.contains('active')) {
                 this.uiManager.closeMobileMenu();
             }
@@ -401,7 +616,17 @@ class EventManager {
         
         // 方向键导航书签卡片
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-            const currentCard = document.activeElement.closest('.bookmark-card');
+            let currentCard = document.activeElement.closest('.bookmark-card');
+            
+            // 如果没有当前选中的卡片，选择第一个卡片
+            if (!currentCard) {
+                const firstCard = document.querySelector('.bookmark-card');
+                if (firstCard) {
+                    firstCard.focus();
+                    currentCard = firstCard;
+                }
+            }
+            
             if (currentCard) {
                 e.preventDefault();
                 this.navigateBookmarks(e.key, currentCard);
@@ -415,26 +640,47 @@ class EventManager {
         const currentIndex = cards.indexOf(currentCard);
         let nextIndex = currentIndex;
         
-        const cols = Math.floor(document.querySelector('.bookmarks-grid').offsetWidth / 320); // 估算列数
+        // 获取网格容器
+        const gridContainer = document.querySelector('.bookmarks-grid');
+        if (!gridContainer || cards.length === 0) return;
         
+        // 计算实际的列数（基于容器宽度和响应式布局）
+        const containerWidth = gridContainer.offsetWidth;
+        const cardMinWidth = window.innerWidth <= this.constants.TABLET_BREAKPOINT 
+            ? this.constants.CARD_MIN_WIDTH.MOBILE 
+            : this.constants.CARD_MIN_WIDTH.DESKTOP;
+        const cols = Math.max(1, Math.floor((containerWidth + this.constants.GRID_GAP) / (cardMinWidth + this.constants.GRID_GAP)));
+        
+        // 计算行数和当前位置
+        const rows = Math.ceil(cards.length / cols);
+        const currentRow = Math.floor(currentIndex / cols);
+        const currentCol = currentIndex % cols;
+        
+        // 根据方向计算下一个索引
         switch (direction) {
             case 'ArrowUp':
-                nextIndex = Math.max(0, currentIndex - cols);
+                nextIndex = currentRow > 0 ? currentIndex - cols : currentIndex;
                 break;
             case 'ArrowDown':
-                nextIndex = Math.min(cards.length - 1, currentIndex + cols);
+                nextIndex = currentRow < rows - 1 ? currentIndex + cols : currentIndex;
                 break;
             case 'ArrowLeft':
-                nextIndex = Math.max(0, currentIndex - 1);
+                nextIndex = currentCol > 0 ? currentIndex - 1 : currentIndex;
                 break;
             case 'ArrowRight':
-                nextIndex = Math.min(cards.length - 1, currentIndex + 1);
+                nextIndex = (currentCol < cols - 1 && currentIndex < cards.length - 1) ? currentIndex + 1 : currentIndex;
                 break;
         }
         
-        if (nextIndex !== currentIndex) {
+        // 确保索引在有效范围内并更新焦点
+        nextIndex = Math.max(0, Math.min(nextIndex, cards.length - 1));
+        
+        if (nextIndex !== currentIndex && cards[nextIndex]) {
             cards[currentIndex].blur();
+            cards[currentIndex].classList.remove('keyboard-focused');
+            
             cards[nextIndex].focus();
+            cards[nextIndex].classList.add('keyboard-focused');
             cards[nextIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     }
@@ -443,24 +689,31 @@ class EventManager {
     handleResizeDebounced() {
         clearTimeout(this.resizeDebounceTimer);
         this.resizeDebounceTimer = setTimeout(() => {
-            // 大屏幕时自动关闭移动端菜单
-            if (window.innerWidth > 768) {
-                this.uiManager.closeMobileMenu();
+                    // 大屏幕时自动关闭移动端菜单
+        if (window.innerWidth > this.constants.MOBILE_BREAKPOINT) {
+            this.uiManager.closeMobileMenu();
+        }
+            
+            // 重新优化标签布局和检查溢出，保持展开状态
+            const wasExpanded = this.uiManager.elements.tagsFilterContent?.classList.contains('expanded');
+            this.uiManager.optimizeTagLayout();
+            
+            if (wasExpanded) {
+                this.uiManager.toggleTagsExpansion(true, false);
+            } else {
+                this.uiManager.checkTagsOverflow();
             }
-        }, 250);
+        }, this.constants.RESIZE_DEBOUNCE_DELAY);
     }
 
     // 处理滚动事件
     handleScroll() {
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const backToTop = this.uiManager.elements.backToTop;
         
         // 显示/隐藏回到顶部按钮
-        if (this.uiManager.elements.backToTop) {
-            if (scrollTop > 300) {
-                this.uiManager.elements.backToTop.style.display = 'flex';
-            } else {
-                this.uiManager.elements.backToTop.style.display = 'none';
-            }
+        if (backToTop) {
+            backToTop.style.display = scrollTop > this.constants.SCROLL_TO_TOP_THRESHOLD ? 'flex' : 'none';
         }
     }
 
@@ -472,24 +725,6 @@ class EventManager {
             backToTopBtn.id = 'backToTop';
             backToTopBtn.className = 'back-to-top';
             backToTopBtn.innerHTML = '<i class="fas fa-arrow-up"></i>';
-            backToTopBtn.style.cssText = `
-                position: fixed;
-                bottom: 30px;
-                right: 30px;
-                width: 50px;
-                height: 50px;
-                background: #2eaadc;
-                color: white;
-                border: none;
-                border-radius: 50%;
-                cursor: pointer;
-                display: none;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                z-index: 1000;
-                transition: all 0.3s ease;
-            `;
             
             document.body.appendChild(backToTopBtn);
             this.uiManager.elements.backToTop = backToTopBtn;
@@ -521,9 +756,6 @@ class EventManager {
             // 获取过滤后的书签
             const filteredBookmarks = this.dataManager.getFilteredBookmarks();
             
-            // 获取统计信息
-            const stats = this.dataManager.getStats();
-            
             // 渲染书签
             this.uiManager.renderBookmarks(filteredBookmarks);
             
@@ -547,7 +779,7 @@ class EventManager {
             
         } catch (error) {
             console.error('❌ EventManager.updateUI 执行失败:', error);
-            console.error('错误堆栈:', error.stack);
+            throw error; // 重新抛出错误，让调用者处理
         }
     }
 
@@ -695,11 +927,11 @@ class EventManager {
 
     // 销毁事件监听器（清理方法）
     destroy() {
+        // 清理定时器
         clearTimeout(this.searchDebounceTimer);
         clearTimeout(this.resizeDebounceTimer);
         
-        // 移除所有事件监听器
-        // 注意：这里只是示例，实际项目中可能需要更详细的清理
+        // 移除全局事件监听器
         window.removeEventListener('resize', this.handleResizeDebounced);
         window.removeEventListener('scroll', this.handleScroll);
         document.removeEventListener('keydown', this.handleKeyboardEvents);
@@ -709,6 +941,12 @@ class EventManager {
         if (indicator) {
             indicator.remove();
         }
+        
+        // 清理键盘焦点样式
+        const focusedCards = document.querySelectorAll('.bookmark-card.keyboard-focused');
+        focusedCards.forEach(card => {
+            card.classList.remove('keyboard-focused');
+        });
     }
 }
 

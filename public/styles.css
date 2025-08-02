@@ -213,26 +213,54 @@ input, textarea {
     pointer-events: auto;
 }
 
+/* 当输入框有内容时显示清除按钮 */
+.header .search-box input:not(:placeholder-shown) + .search-clear {
+    opacity: 1;
+    pointer-events: auto;
+}
+
 .header .search-box .search-clear {
     position: absolute;
-    right: 16px;
-    width: 20px;
-    height: 20px;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: auto;
+    height: auto;
     border: none;
-    background: #9b9a97;
-    color: white;
-    border-radius: 50%;
-    font-size: 10px;
+    background: transparent;
+    color: #9b9a97;
+    font-size: 16px;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     opacity: 0;
     pointer-events: none;
     transition: all 0.2s ease;
     z-index: 2;
+    padding: 4px;
+    border-radius: 4px;
+    touch-action: manipulation;
+}
+
+.header .search-box .search-clear i {
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .header .search-box .search-clear:hover {
-    background: #ff4757;
-    transform: scale(1.1);
+    background: rgba(155, 154, 151, 0.1);
+    color: #37352f;
+    transform: translateY(-50%);
+}
+
+.header .search-box .search-clear:active {
+    background: rgba(155, 154, 151, 0.2);
+    color: #37352f;
+    transform: translateY(-50%);
 }
 
 /* 刷新按钮 */
@@ -260,6 +288,19 @@ input, textarea {
 
 .sync-btn:active {
     transform: translateY(0);
+}
+
+.sync-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none;
+    box-shadow: none;
+}
+
+.sync-btn:disabled i {
+    animation: spin 1s linear infinite;
+    transform: none;
 }
 
 .sync-btn i {
@@ -570,28 +611,54 @@ input, textarea {
     pointer-events: auto;
 }
 
+/* 当输入框有内容时显示清除按钮 */
+.main-content .search-box input:not(:placeholder-shown) + .search-clear {
+    opacity: 1;
+    pointer-events: auto;
+}
+
 .main-content .search-box .search-clear {
     position: absolute;
-    right: 16px;
+    right: 12px;
     top: 50%;
     transform: translateY(-50%);
-    width: 20px;
-    height: 20px;
+    width: auto;
+    height: auto;
     border: none;
-    background: #9b9a97;
-    color: white;
-    border-radius: 50%;
-    font-size: 10px;
+    background: transparent;
+    color: #9b9a97;
+    font-size: 16px;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     opacity: 0;
     pointer-events: none;
     transition: all 0.2s ease;
     z-index: 2;
+    padding: 4px;
+    border-radius: 4px;
+    touch-action: manipulation;
+}
+
+.main-content .search-box .search-clear i {
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .main-content .search-box .search-clear:hover {
-    background: #ff4757;
-    transform: translateY(-50%) scale(1.1);
+    background: rgba(155, 154, 151, 0.1);
+    color: #37352f;
+    transform: translateY(-50%);
+}
+
+.main-content .search-box .search-clear:active {
+    background: rgba(155, 154, 151, 0.2);
+    color: #37352f;
+    transform: translateY(-50%);
 }
 
 /* 页面标题区域 */
@@ -639,7 +706,6 @@ input, textarea {
     grid-column: 1 / -1;
     display: flex;
     align-items: center;
-    justify-content: space-between;
     padding: 16px 0;
     margin-bottom: 16px;
     border-bottom: 2px solid #f1f1ef;
@@ -652,7 +718,7 @@ input, textarea {
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
 }
 
 .group-title::before {
@@ -670,6 +736,7 @@ input, textarea {
     padding: 4px 12px;
     border-radius: 12px;
     font-weight: 500;
+    margin-left: 8px;
 }
 
 .bookmark-group {
@@ -740,32 +807,30 @@ input, textarea {
     }
     
     .bookmark-quick-access {
-        width: 28px;
-        height: 28px;
+        padding: 8px 12px;
         font-size: 11px;
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+        background: rgba(79, 172, 254, 0.1) !important;
         backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(79, 172, 254, 0.2);
+        color: #4facfe;
+        min-width: auto;
+        min-height: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
     }
     
     .bookmark-quick-access:hover {
-        background: linear-gradient(135deg, #3a9bfe 0%, #00e6fe 100%) !important;
-        transform: scale(1.05);
+        background: rgba(79, 172, 254, 0.15) !important;
+        transform: translateY(-1px);
+        color: #3a9bfe;
     }
     
     /* 移动端触摸反馈 */
     .bookmark-quick-access:active {
-        transform: scale(0.95) !important;
-        background: linear-gradient(135deg, #4facfe 0.8, #00f2fe 0.8) !important;
-    }
-    
-    /* 确保移动端按钮有足够的触摸区域 */
-    .bookmark-quick-access {
-        min-width: 44px;
-        min-height: 44px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        transform: translateY(0) !important;
+        background: rgba(79, 172, 254, 0.2) !important;
     }
 }
 
@@ -780,9 +845,13 @@ input, textarea {
     }
     
     .bookmark-quick-access {
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: transparent !important;
+        backdrop-filter: none;
+        border: none;
+        color: #4facfe;
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }
 }
 
@@ -853,6 +922,22 @@ input, textarea {
         gap: 12px;
     }
     
+    .bookmark-group-header {
+        padding: 10px 0;
+        margin-bottom: 10px;
+    }
+    
+    .group-title {
+        font-size: 16px;
+        gap: 6px;
+    }
+    
+    .group-count {
+        font-size: 11px;
+        padding: 2px 6px;
+        margin-left: 4px;
+    }
+    
     /* 小屏幕移动端快速访问按钮样式 */
     .bookmark-actions {
         opacity: 1 !important;
@@ -864,17 +949,21 @@ input, textarea {
     }
     
     .bookmark-quick-access {
-        width: 26px;
-        height: 26px;
-        font-size: 10px;
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 6px 10px;
+        font-size: 11px;
+        background: transparent !important;
+        backdrop-filter: none;
+        border: none;
+        color: #4facfe;
+        display: flex;
+        align-items: center;
+        gap: 3px;
     }
     
     .bookmark-quick-access:hover {
-        background: linear-gradient(135deg, #3a9bfe 0%, #00e6fe 100%) !important;
-        transform: scale(1.05);
+        background: rgba(79, 172, 254, 0.15) !important;
+        transform: translateY(-1px);
+        color: #3a9bfe;
     }
     
     .logo {
@@ -988,6 +1077,7 @@ input, textarea {
     position: relative;
     overflow: hidden;
     outline: none;
+    outline-offset: 3px;
     box-shadow: 
         0 2px 8px rgba(0, 0, 0, 0.06), 
         0 1px 3px rgba(0, 0, 0, 0.1),
@@ -995,10 +1085,13 @@ input, textarea {
 }
 
 .bookmark-card:hover {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12), 0 4px 10px rgba(0, 0, 0, 0.08);
+    background: linear-gradient(135deg, #ffffff 0%, #f0f8ff 100%);
+    box-shadow: 0 12px 30px rgba(46, 170, 220, 0.3);
     transform: translateY(-3px);
-    border-color: #d1d5db;
+    border-color: #2eaadc;
+    outline: 3px solid #2eaadc;
+    outline-offset: 3px;
+    z-index: 10;
 }
 
 .bookmark-card:focus {
@@ -1012,6 +1105,27 @@ input, textarea {
 .bookmark-card:focus .bookmark-actions {
     opacity: 1;
     transform: translateX(0);
+}
+
+.bookmark-card.keyboard-focused {
+    outline: 3px solid #2eaadc;
+    outline-offset: 3px;
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(46, 170, 220, 0.3);
+    z-index: 10;
+    background: linear-gradient(135deg, #ffffff 0%, #f0f8ff 100%);
+    border-color: #2eaadc;
+}
+
+.bookmark-card.keyboard-focused .bookmark-actions {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.bookmark-card.keyboard-focused .bookmark-quick-access {
+    background: linear-gradient(135deg, #2eaadc 0%, #2596be 100%);
+    color: white;
+    transform: scale(1.05);
 }
 
 .bookmark-header {
@@ -1096,38 +1210,52 @@ input, textarea {
     transform: translateX(0);
 }
 
-.bookmark-quick-access {
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+.bookmark-card:hover .bookmark-quick-access {
+    background: linear-gradient(135deg, #2eaadc 0%, #2596be 100%);
     color: white;
-    border-radius: 50%;
+    transform: scale(1.05);
+}
+
+.bookmark-quick-access {
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    color: #4facfe;
+    border-radius: 6px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 12px;
+    font-weight: 500;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(79, 172, 254, 0.3);
+    text-decoration: none;
 }
 
 .bookmark-quick-access:hover {
-    background: linear-gradient(135deg, #3a9bfe 0%, #00e6fe 100%);
-    transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(79, 172, 254, 0.4);
+    background: transparent;
+    color: #3a9bfe;
+    transform: translateY(-1px);
 }
 
 .bookmark-quick-access:active {
-    transform: scale(0.95);
+    transform: translateY(0);
+    background: transparent;
 }
 
 .bookmark-quick-access i {
+    margin-right: 4px;
     transition: transform 0.3s ease;
 }
 
+.bookmark-quick-access span {
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
 .bookmark-quick-access:hover i {
-    transform: translateX(1px) translateY(-1px);
+    transform: translateX(1px);
 }
 
 /* 移除重复的样式定义 */
@@ -1552,6 +1680,11 @@ input, textarea {
         font-size: 20px;
     }
     
+    /* 移动端隐藏使用提示 */
+    .usage-tips {
+        display: none;
+    }
+    
     .bookmarks-grid {
         grid-template-columns: 1fr;
         gap: 16px;
@@ -1570,11 +1703,13 @@ input, textarea {
     
     .group-title {
         font-size: 18px;
+        gap: 8px;
     }
     
     .group-count {
         font-size: 12px;
         padding: 3px 8px;
+        margin-left: 6px;
     }
     
     .footer-content {
@@ -1735,23 +1870,29 @@ input, textarea {
     }
     
     .bookmark-card .bookmark-quick-access {
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        min-width: 44px;
-        min-height: 44px;
-        box-shadow: 0 2px 8px rgba(79, 172, 254, 0.2);
+        background: transparent !important;
+        backdrop-filter: none;
+        border: none;
+        padding: 8px 12px;
+        min-width: auto;
+        min-height: auto;
+        box-shadow: none;
+        color: #4facfe;
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }
     
     .bookmark-card .bookmark-quick-access:hover {
-        background: linear-gradient(135deg, #3a9bfe 0%, #00e6fe 100%) !important;
-        transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
+        background: transparent !important;
+        transform: translateY(-1px);
+        box-shadow: none;
+        color: #3a9bfe;
     }
     
     .bookmark-card .bookmark-quick-access:active {
-        transform: scale(0.95) !important;
-        background: linear-gradient(135deg, #4facfe 0.8, #00f2fe 0.8) !important;
+        transform: translateY(0) !important;
+        background: transparent !important;
     }
     
     /* 平板端图标尺寸调整 */
@@ -1797,11 +1938,27 @@ input, textarea {
     }
     
     .bookmark-card .bookmark-quick-access {
-        width: 26px;
-        height: 26px;
+        padding: 6px 10px;
+        font-size: 11px;
+        min-width: auto;
+        min-height: auto;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+    }
+    
+    .bookmark-card .bookmark-quick-access span {
         font-size: 10px;
-        min-width: 26px;
-        min-height: 26px;
+    }
+    
+    .bookmark-quick-access span {
+        font-size: 10px;
+    }
+    
+    .bookmark-quick-access:hover {
+        background: transparent !important;
+        transform: translateY(-1px);
+        color: #3a9bfe;
     }
     
     /* 移动端图标尺寸调整 */
@@ -1857,13 +2014,28 @@ input, textarea {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
+    gap: 16px;
 }
 
-.tags-filter-header h3 {
+.tags-filter-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.tags-filter-title h3 {
     font-size: 16px;
     font-weight: 600;
     color: #37352f;
     margin: 0;
+    white-space: nowrap;
+}
+
+.tags-filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
 }
 
 .clear-tags-btn {
@@ -1887,18 +2059,71 @@ input, textarea {
     box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
 }
 
+.expand-tags-btn {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.expand-tags-btn:hover {
+    background: linear-gradient(135deg, #3a9bfe 0%, #00e6fe 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(79, 172, 254, 0.3);
+}
+
+.expand-tags-btn.expanded {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+}
+
+.expand-tags-btn.expanded:hover {
+    background: linear-gradient(135deg, #5a6268 0%, #343a40 100%);
+}
+
+.expand-tags-btn.expanded i {
+    transform: rotate(180deg);
+}
+
+.expand-tags-btn:disabled {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.expand-tags-btn:disabled:hover {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    transform: none;
+    box-shadow: none;
+}
+
 .tags-filter-content {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
     min-height: 32px;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    line-height: 1;
+    width: 100%;
+}
+
+.tags-filter-content.expanded {
+    max-height: none;
 }
 
 .filter-tag {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     color: #495057;
-    padding: 6px 12px;
-    border-radius: 20px;
+    padding: 5px 10px;
+    border-radius: 18px;
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -1906,7 +2131,7 @@ input, textarea {
     border: 1px solid #dee2e6;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     position: relative;
     overflow: hidden;
 }
@@ -1933,11 +2158,11 @@ input, textarea {
 .filter-tag .tag-count {
     background: rgba(255, 255, 255, 0.2);
     color: inherit;
-    padding: 2px 6px;
-    border-radius: 10px;
+    padding: 1px 5px;
+    border-radius: 8px;
     font-size: 11px;
     font-weight: 600;
-    min-width: 20px;
+    min-width: 18px;
     text-align: center;
 }
 
@@ -1953,22 +2178,27 @@ input, textarea {
         margin-bottom: 16px;
     }
     
-    .tags-filter-header h3 {
+    .tags-filter-title h3 {
         font-size: 14px;
     }
     
+    .tags-filter-actions {
+        gap: 6px;
+    }
+    
+    .expand-tags-btn,
     .clear-tags-btn {
         padding: 4px 8px;
         font-size: 11px;
     }
     
     .filter-tag {
-        padding: 4px 10px;
+        padding: 4px 8px;
         font-size: 12px;
     }
     
     .tags-filter-content {
-        gap: 6px;
+        gap: 5px;
     }
 }
 
@@ -1979,30 +2209,41 @@ input, textarea {
     }
     
     .tags-filter-header {
-        flex-direction: column;
-        align-items: flex-start;
+        flex-direction: row;
+        align-items: center;
         gap: 8px;
     }
     
-    .tags-filter-header h3 {
+    .tags-filter-title h3 {
         font-size: 13px;
     }
     
+    .tags-filter-actions {
+        gap: 4px;
+        flex-shrink: 0;
+    }
+    
+    .expand-tags-btn,
     .clear-tags-btn {
-        align-self: flex-end;
         padding: 3px 6px;
         font-size: 10px;
+        min-width: 60px;
+        justify-content: center;
     }
     
     .filter-tag {
-        padding: 3px 8px;
+        padding: 3px 6px;
         font-size: 11px;
     }
     
     .filter-tag .tag-count {
         font-size: 10px;
-        padding: 1px 4px;
-        min-width: 16px;
+        padding: 1px 3px;
+        min-width: 14px;
+    }
+    
+    .tags-filter-content {
+        gap: 4px;
     }
 }
 
@@ -2305,11 +2546,25 @@ input, textarea {
 .diagnosis-retry {
     background: linear-gradient(135deg, #3742fa 0%, #2f3542 100%);
     color: white;
+    min-width: 120px;
+    justify-content: center;
 }
 
 .diagnosis-retry:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(55, 66, 250, 0.3);
+}
+
+.diagnosis-retry:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none;
+    box-shadow: none;
+}
+
+.diagnosis-retry:disabled i {
+    animation: spin 1s linear infinite;
 }
 
 .diagnosis-close {
@@ -2349,6 +2604,11 @@ input, textarea {
     .diagnosis-close {
         width: 100%;
         justify-content: center;
+        min-width: auto;
+    }
+    
+    .diagnosis-retry:disabled {
+        opacity: 0.7;
     }
 }
 
@@ -2382,4 +2642,168 @@ input, textarea {
 
 .diagnose-btn:hover i {
     transform: rotate(180deg);
+}
+
+.diagnose-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none;
+    box-shadow: none;
+}
+
+.diagnose-btn:disabled i {
+    animation: spin 1s linear infinite;
+    transform: none;
+}
+
+/* 移动端搜索框清除按钮样式优化 */
+@media (max-width: 768px) {
+    .main-content .search-box .search-clear {
+        right: 10px;
+        padding: 6px;
+        font-size: 18px;
+    }
+    
+    .main-content .search-box .search-clear i {
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .main-content .search-box input {
+        padding-right: 44px;
+    }
+    
+    .header .search-box .search-clear {
+        right: 10px;
+        padding: 6px;
+        font-size: 18px;
+    }
+    
+    .header .search-box .search-clear i {
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .header .search-box input {
+        padding-right: 44px;
+    }
+}
+
+@media (max-width: 640px) {
+    .main-content .search-box .search-clear {
+        right: 8px;
+        padding: 5px;
+        font-size: 16px;
+    }
+    
+    .main-content .search-box .search-clear i {
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .main-content .search-box input {
+        padding-right: 40px;
+        font-size: 14px;
+    }
+    
+    .header .search-box .search-clear {
+        right: 8px;
+        padding: 5px;
+        font-size: 16px;
+    }
+    
+    .header .search-box .search-clear i {
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .header .search-box input {
+        padding-right: 40px;
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-content .search-box .search-clear {
+        right: 6px;
+        padding: 4px;
+        font-size: 14px;
+    }
+    
+    .main-content .search-box .search-clear i {
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .main-content .search-box input {
+        padding-right: 36px;
+        font-size: 13px;
+    }
+    
+    .header .search-box .search-clear {
+        right: 6px;
+        padding: 4px;
+        font-size: 14px;
+    }
+    
+    .header .search-box .search-clear i {
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .header .search-box input {
+        padding-right: 36px;
+        font-size: 13px;
+    }
+}
+
+/* 移动端触摸优化 */
+@media (hover: none) and (pointer: coarse) {
+    .search-clear {
+        transition: all 0.2s ease;
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    .search-clear:hover {
+        transform: translateY(-50%);
+    }
+    
+    .search-clear:active {
+        transform: translateY(-50%);
+        background: rgba(155, 154, 151, 0.2);
+        color: #37352f;
+    }
+    
+    .search-clear:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(46, 170, 220, 0.3);
+    }
+    
+    /* 移动端书签卡片优化 */
+    .bookmark-card {
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    .bookmark-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(46, 170, 220, 0.2);
+    }
+    
+    .bookmark-card:active {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(46, 170, 220, 0.15);
+    }
 }

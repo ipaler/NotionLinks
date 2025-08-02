@@ -7,6 +7,12 @@ class UIManager {
         // favicon缓存
         this.faviconCache = new Map();
         
+        // 标签展开状态管理
+        this.tagsExpansionState = {
+            userExpanded: false, // 用户是否主动展开
+            autoCollapse: false  // 是否允许自动收起
+        };
+        
         try {
             this.elements = {
                 bookmarksGrid: document.getElementById('bookmarksGrid'),
@@ -14,7 +20,9 @@ class UIManager {
                 tagsFilterBar: document.getElementById('tagsFilterBar'),
                 tagsFilterContent: document.getElementById('tagsFilterContent'),
                 clearTagsBtn: document.getElementById('clearTagsBtn'),
+                expandTagsBtn: document.getElementById('expandTagsBtn'),
                 searchInput: document.getElementById('searchInput'),
+                searchClear: document.getElementById('searchClear'),
                 pageTitle: document.getElementById('pageTitle'),
                 syncBtn: document.getElementById('syncBtn'),
                 diagnoseBtn: document.getElementById('diagnoseBtn'),
@@ -81,6 +89,7 @@ class UIManager {
                 <div class="bookmark-actions">
                     <button class="bookmark-quick-access" title="快速访问" data-url="${bookmark.url || ''}">
                         <i class="fas fa-external-link-alt"></i>
+                        <span>直达</span>
                     </button>
                 </div>
             </div>
@@ -127,8 +136,7 @@ class UIManager {
                 const groupHeader = document.createElement('div');
                 groupHeader.className = 'bookmark-group-header';
                 groupHeader.innerHTML = `
-                    <h3 class="group-title">${group.category}</h3>
-                    <span class="group-count">${group.bookmarks.length} 个书签</span>
+                    <h3 class="group-title">${group.category} <span class="group-count">${group.bookmarks.length} 个书签</span></h3>
                 `;
                 fragment.appendChild(groupHeader);
                 
@@ -220,6 +228,19 @@ class UIManager {
                 filterTagElement.classList.add('selected');
             }
         });
+        
+        // 优化标签布局并检查是否需要显示展开按钮
+        setTimeout(() => {
+            const wasExpanded = this.elements.tagsFilterContent.classList.contains('expanded');
+            this.optimizeTagLayout();
+            
+            // 如果之前是展开状态，保持展开
+            if (wasExpanded) {
+                this.toggleTagsExpansion(true, false);
+            } else {
+                this.checkTagsOverflow();
+            }
+        }, 50);
     }
 
     // 显示书签详情
@@ -339,7 +360,7 @@ class UIManager {
 
     // 更新页面标题
     updatePageTitle(category, tags) {
-        let title = '全部';
+        let title = '全部书签';
         
         if (category !== 'all') {
             title = `${category}`;
@@ -445,6 +466,212 @@ class UIManager {
                     statusElement.remove();
                 }
             }, 300);
+        }
+    }
+
+    // 管理搜索清除按钮的显示/隐藏
+    toggleSearchClearButton(show) {
+        if (this.elements.searchClear) {
+            if (show) {
+                this.elements.searchClear.style.display = 'flex';
+                this.elements.searchClear.style.opacity = '1';
+                this.elements.searchClear.style.pointerEvents = 'auto';
+                
+                // 移动端优化：确保按钮可见且可点击
+                if (window.innerWidth <= 768) {
+                    this.elements.searchClear.style.zIndex = '10';
+                }
+            } else {
+                this.elements.searchClear.style.opacity = '0';
+                this.elements.searchClear.style.pointerEvents = 'none';
+                setTimeout(() => {
+                    if (this.elements.searchClear) {
+                        this.elements.searchClear.style.display = 'none';
+                        this.elements.searchClear.style.zIndex = '2';
+                    }
+                }, 300);
+            }
+        }
+    }
+
+    // 管理标签展开状态
+    toggleTagsExpansion(expanded, isUserAction = false) {
+        if (this.elements.tagsFilterContent) {
+            if (expanded) {
+                this.elements.tagsFilterContent.classList.add('expanded');
+                this.elements.tagsFilterContent.style.maxHeight = 'none';
+                // 展开时显示所有标签
+                const tags = this.elements.tagsFilterContent.querySelectorAll('.filter-tag');
+                tags.forEach(tag => {
+                    tag.style.display = 'flex';
+                });
+                
+                // 如果是用户操作，标记为用户展开
+                if (isUserAction) {
+                    this.tagsExpansionState.userExpanded = true;
+                    this.tagsExpansionState.autoCollapse = false;
+                }
+            } else {
+                this.elements.tagsFilterContent.classList.remove('expanded');
+                // 收起时重新优化布局
+                this.optimizeTagLayout();
+                
+                // 如果是用户操作，重置状态
+                if (isUserAction) {
+                    this.tagsExpansionState.userExpanded = false;
+                    this.tagsExpansionState.autoCollapse = true;
+                }
+                
+                // 延迟检查，避免立即触发自动收起
+                setTimeout(() => {
+                    this.checkTagsOverflow();
+                }, 100);
+            }
+        }
+        
+        if (this.elements.expandTagsBtn) {
+            if (expanded) {
+                this.elements.expandTagsBtn.style.display = 'flex';
+                this.elements.expandTagsBtn.classList.add('expanded');
+                this.elements.expandTagsBtn.innerHTML = '<i class="fas fa-chevron-up"></i><span>收起</span>';
+                this.elements.expandTagsBtn.disabled = false;
+                this.elements.expandTagsBtn.style.opacity = '1';
+            } else {
+                this.elements.expandTagsBtn.classList.remove('expanded');
+                this.elements.expandTagsBtn.innerHTML = '<i class="fas fa-chevron-down"></i><span>展开</span>';
+                this.elements.expandTagsBtn.disabled = false;
+                this.elements.expandTagsBtn.style.opacity = '1';
+                // 收起时检查是否需要隐藏按钮
+                setTimeout(() => {
+                    this.checkTagsOverflow();
+                }, 50);
+            }
+        }
+    }
+
+    // 优化标签布局
+    optimizeTagLayout() {
+        if (!this.elements.tagsFilterContent) return;
+        
+        const content = this.elements.tagsFilterContent;
+        const tags = content.querySelectorAll('.filter-tag');
+        
+        if (tags.length === 0) return;
+        
+        // 计算容器宽度和标签间距
+        const containerWidth = content.offsetWidth;
+        const gap = 6; // CSS中设置的gap值
+        
+        // 计算每个标签的宽度（包括间距）
+        let totalWidth = 0;
+        const tagWidths = [];
+        
+        tags.forEach(tag => {
+            const tagWidth = tag.offsetWidth;
+            tagWidths.push(tagWidth);
+            totalWidth += tagWidth + gap;
+        });
+        
+        // 如果总宽度超过容器宽度，需要调整
+        if (totalWidth > containerWidth) {
+            // 计算可以容纳的标签数量
+            let currentWidth = 0;
+            let visibleCount = 0;
+            
+            for (let i = 0; i < tagWidths.length; i++) {
+                if (currentWidth + tagWidths[i] + gap <= containerWidth) {
+                    currentWidth += tagWidths[i] + gap;
+                    visibleCount++;
+                } else {
+                    break;
+                }
+            }
+            
+            // 隐藏超出第一行的标签
+            tags.forEach((tag, index) => {
+                if (index >= visibleCount) {
+                    tag.style.display = 'none';
+                } else {
+                    tag.style.display = 'flex';
+                }
+            });
+        } else {
+            // 显示所有标签
+            tags.forEach(tag => {
+                tag.style.display = 'flex';
+            });
+        }
+    }
+
+    // 检查是否需要显示展开按钮
+    checkTagsOverflow() {
+        if (!this.elements.tagsFilterContent || !this.elements.expandTagsBtn) return;
+        
+        const content = this.elements.tagsFilterContent;
+        const isExpanded = content.classList.contains('expanded');
+        
+        // 计算一行的高度（标签高度 + gap）
+        const firstTag = content.querySelector('.filter-tag');
+        if (!firstTag) {
+            // 如果没有标签，隐藏展开按钮
+            this.elements.expandTagsBtn.style.display = 'none';
+            return;
+        }
+        
+        const tagHeight = firstTag.offsetHeight;
+        const gap = 6; // CSS中设置的gap值
+        const singleLineHeight = tagHeight + gap;
+        
+        // 设置默认状态下的max-height为一行高度
+        if (!isExpanded) {
+            content.style.maxHeight = singleLineHeight + 'px';
+        }
+        
+        // 检查是否有隐藏的标签
+        const tags = content.querySelectorAll('.filter-tag');
+        const hiddenTags = Array.from(tags).filter(tag => tag.style.display === 'none');
+        
+        if (isExpanded) {
+            // 如果已展开，只有在允许自动收起且内容确实不需要展开时才自动收起
+            if (this.tagsExpansionState.autoCollapse) {
+                const containerWidth = content.offsetWidth;
+                let totalWidth = 0;
+                tags.forEach(tag => {
+                    totalWidth += tag.offsetWidth + gap;
+                });
+                
+                // 只有当所有标签都能在一行显示时才自动收起
+                if (totalWidth <= containerWidth) {
+                    this.toggleTagsExpansion(false);
+                }
+            }
+        } else {
+            // 如果未展开，检查是否需要展开按钮
+            if (hiddenTags.length === 0) {
+                // 没有隐藏的标签，检查是否所有标签都能在一行显示
+                const containerWidth = content.offsetWidth;
+                let totalWidth = 0;
+                tags.forEach(tag => {
+                    totalWidth += tag.offsetWidth + gap;
+                });
+                
+                if (totalWidth <= containerWidth) {
+                    // 所有标签都能在一行显示，隐藏按钮
+                    this.elements.expandTagsBtn.style.display = 'none';
+                } else {
+                    // 标签超过一行但被隐藏了，显示"无更多"
+                    this.elements.expandTagsBtn.style.display = 'flex';
+                    this.elements.expandTagsBtn.innerHTML = '<i class="fas fa-chevron-down"></i><span>无更多</span>';
+                    this.elements.expandTagsBtn.disabled = true;
+                    this.elements.expandTagsBtn.style.opacity = '0.5';
+                }
+            } else {
+                // 有隐藏的标签，显示"展开"
+                this.elements.expandTagsBtn.style.display = 'flex';
+                this.elements.expandTagsBtn.innerHTML = '<i class="fas fa-chevron-down"></i><span>展开</span>';
+                this.elements.expandTagsBtn.disabled = false;
+                this.elements.expandTagsBtn.style.opacity = '1';
+            }
         }
     }
     
@@ -728,18 +955,63 @@ class UIManager {
             </div>
             
             <div class="diagnosis-actions">
-                <button class="diagnosis-retry" onclick="window.bookmarkApp.uiManager.performNetworkDiagnosis().then(results => window.bookmarkApp.uiManager.showNetworkDiagnosis(results))">
+                <button class="diagnosis-retry" id="diagnosisRetryBtn">
                     <i class="fas fa-redo"></i>
                     重新诊断
                 </button>
-                <button class="diagnosis-close" onclick="window.bookmarkApp.uiManager.closeModal()">
+                <button class="diagnosis-close" id="diagnosisCloseBtn">
                     <i class="fas fa-times"></i>
                     关闭
                 </button>
             </div>
         `;
 
+        // 绑定重新诊断按钮事件
+        const retryBtn = modalBody.querySelector('#diagnosisRetryBtn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', async () => {
+                await this.handleDiagnosisRetry(retryBtn);
+            });
+        }
+
+        // 绑定关闭按钮事件
+        const closeBtn = modalBody.querySelector('#diagnosisCloseBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.closeModal();
+            });
+        }
+
         modal.classList.add('show');
+    }
+
+    // 处理重新诊断
+    async handleDiagnosisRetry(retryBtn) {
+        try {
+            // 显示加载状态
+            retryBtn.disabled = true;
+            retryBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 诊断中...';
+            
+            // 显示加载消息
+            this.showMessage('正在执行网络诊断...', 'info', 2000);
+            
+            // 执行诊断
+            const results = await this.performNetworkDiagnosis();
+            
+            // 更新诊断结果
+            this.showNetworkDiagnosis(results);
+            
+            // 显示成功消息
+            this.showMessage('网络诊断完成', 'success', 3000);
+            
+        } catch (error) {
+            console.error('重新诊断失败:', error);
+            this.showMessage('重新诊断失败，请稍后重试', 'error');
+            
+            // 恢复按钮状态
+            retryBtn.disabled = false;
+            retryBtn.innerHTML = '<i class="fas fa-redo"></i> 重新诊断';
+        }
     }
     
     // 绑定书签事件

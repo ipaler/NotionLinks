@@ -68,11 +68,19 @@
             <!-- 标签筛选栏 -->
             <div class="tags-filter-bar" id="tagsFilterBar">
                 <div class="tags-filter-header">
-                    <h3>🏷️ 标签筛选</h3>
-                    <button class="clear-tags-btn" id="clearTagsBtn" style="display: none;">
-                        <i class="fas fa-times"></i>
-                        清除选择
-                    </button>
+                    <div class="tags-filter-title">
+                        <h3>🏷️ 标签筛选</h3>
+                    </div>
+                    <div class="tags-filter-actions">
+                        <button class="expand-tags-btn" id="expandTagsBtn" style="display: none;">
+                            <i class="fas fa-chevron-down"></i>
+                            <span>展开</span>
+                        </button>
+                        <button class="clear-tags-btn" id="clearTagsBtn" style="display: none;">
+                            <i class="fas fa-times"></i>
+                            清除选择
+                        </button>
+                    </div>
                 </div>
                 <div class="tags-filter-content" id="tagsFilterContent">
                     <!-- 动态生成的标签将在这里显示 -->

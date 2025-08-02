@@ -10,10 +10,32 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 中间件配置
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+// 安全中间件配置
+app.use(cors({
+    origin: process.env.NODE_ENV === 'production' ? false : true,
+    credentials: true
+}));
+
+// 请求大小限制
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// 静态文件服务（带缓存控制）
+app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+    etag: true,
+    lastModified: true
+}));
+
+// 请求日志中间件
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        console.log(`${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
+    });
+    next();
+});
 
 // Notion API 配置（从环境变量读取，不暴露给前端）
 const NOTION_CONFIG = {
@@ -21,6 +43,53 @@ const NOTION_CONFIG = {
     databaseId: process.env.NOTION_DATABASE_ID,
     apiUrl: 'https://api.notion.com/v1'
 };
+
+// 请求频率限制存储
+const rateLimitStore = new Map();
+const RATE_LIMIT = {
+    windowMs: 60 * 1000, // 1分钟
+    maxRequests: 30 // 每分钟最多30次请求
+};
+
+// 请求频率限制检查函数
+function isRateLimited(clientIP) {
+    const now = Date.now();
+    const windowStart = now - RATE_LIMIT.windowMs;
+    
+    if (!rateLimitStore.has(clientIP)) {
+        rateLimitStore.set(clientIP, []);
+    }
+    
+    const requests = rateLimitStore.get(clientIP);
+    
+    // 清理过期的请求记录
+    const validRequests = requests.filter(timestamp => timestamp > windowStart);
+    rateLimitStore.set(clientIP, validRequests);
+    
+    // 检查是否超过限制
+    if (validRequests.length >= RATE_LIMIT.maxRequests) {
+        return true;
+    }
+    
+    // 记录当前请求
+    validRequests.push(now);
+    return false;
+}
+
+// 定期清理过期的频率限制记录
+setInterval(() => {
+    const now = Date.now();
+    const windowStart = now - RATE_LIMIT.windowMs;
+    
+    for (const [clientIP, requests] of rateLimitStore.entries()) {
+        const validRequests = requests.filter(timestamp => timestamp > windowStart);
+        if (validRequests.length === 0) {
+            rateLimitStore.delete(clientIP);
+        } else {
+            rateLimitStore.set(clientIP, validRequests);
+        }
+    }
+}, 5 * 60 * 1000); // 每5分钟清理一次
 
 // 验证环境变量
 if (!NOTION_CONFIG.token || !NOTION_CONFIG.databaseId) {
@@ -44,6 +113,17 @@ app.get('/api/bookmarks', async (req, res) => {
     
     try {
         console.log('📡 开始获取书签数据...');
+        
+        // 请求频率限制检查
+        const clientIP = req.ip || req.connection.remoteAddress;
+        if (isRateLimited(clientIP)) {
+            return res.status(429).json({
+                success: false,
+                error: 'RATE_LIMITED',
+                message: '请求过于频繁，请稍后重试',
+                responseTime: Date.now() - startTime
+            });
+        }
         
         // 创建AbortController用于超时控制
         const controller = new AbortController();
@@ -259,12 +339,47 @@ app.use((req, res) => {
     });
 });
 
-// 启动服务器
-app.listen(PORT, () => {
+// 优雅启动服务器
+const server = app.listen(PORT, () => {
     console.log(`🚀 服务器启动成功！`);
     console.log(`📱 本地访问: http://localhost:${PORT}`);
     console.log(`🔒 API 密钥已安全保护在服务器端`);
     console.log(`📊 API 端点: http://localhost:${PORT}/api/bookmarks`);
+    console.log(`⚡ 请求频率限制: ${RATE_LIMIT.maxRequests}次/${RATE_LIMIT.windowMs/1000}秒`);
+});
+
+// 优雅关闭处理
+process.on('SIGTERM', () => {
+    console.log('🛑 收到 SIGTERM 信号，正在优雅关闭服务器...');
+    server.close(() => {
+        console.log('✅ 服务器已关闭');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', () => {
+    console.log('🛑 收到 SIGINT 信号，正在优雅关闭服务器...');
+    server.close(() => {
+        console.log('✅ 服务器已关闭');
+        process.exit(0);
+    });
+});
+
+// 未捕获异常处理
+process.on('uncaughtException', (error) => {
+    console.error('❌ 未捕获的异常:', error);
+    server.close(() => {
+        console.log('🛑 服务器因异常而关闭');
+        process.exit(1);
+    });
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ 未处理的 Promise 拒绝:', reason);
+    server.close(() => {
+        console.log('🛑 服务器因未处理的 Promise 拒绝而关闭');
+        process.exit(1);
+    });
 });
 
 // 优雅关闭

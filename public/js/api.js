@@ -13,8 +13,17 @@ class ApiService {
                 retryDelay: 1000,
                 backoffMultiplier: 2
             },
-            timeout: 30000 // 30秒超时
+            timeout: 30000, // 30秒超时
+            cache: {
+                enabled: true,
+                duration: 5 * 60 * 1000, // 5分钟缓存
+                maxSize: 100 // 最大缓存条目数
+            }
         };
+        
+        // 缓存存储
+        this.cache = new Map();
+        this.cacheTimestamps = new Map();
         
         this.networkStatus = {
             isOnline: navigator.onLine,
@@ -144,8 +153,66 @@ class ApiService {
         }
     }
 
+    // 缓存管理方法
+    getCacheKey(url) {
+        return `api_${url}`;
+    }
+    
+    getFromCache(key) {
+        if (!this.config.cache.enabled) return null;
+        
+        const timestamp = this.cacheTimestamps.get(key);
+        if (!timestamp || Date.now() - timestamp > this.config.cache.duration) {
+            this.cache.delete(key);
+            this.cacheTimestamps.delete(key);
+            return null;
+        }
+        
+        return this.cache.get(key);
+    }
+    
+    setCache(key, data) {
+        if (!this.config.cache.enabled) return;
+        
+        // 清理过期缓存
+        this.cleanupCache();
+        
+        // 检查缓存大小限制
+        if (this.cache.size >= this.config.cache.maxSize) {
+            const oldestKey = this.cache.keys().next().value;
+            this.cache.delete(oldestKey);
+            this.cacheTimestamps.delete(oldestKey);
+        }
+        
+        this.cache.set(key, data);
+        this.cacheTimestamps.set(key, Date.now());
+    }
+    
+    cleanupCache() {
+        const now = Date.now();
+        for (const [key, timestamp] of this.cacheTimestamps.entries()) {
+            if (now - timestamp > this.config.cache.duration) {
+                this.cache.delete(key);
+                this.cacheTimestamps.delete(key);
+            }
+        }
+    }
+    
+    clearCache() {
+        this.cache.clear();
+        this.cacheTimestamps.clear();
+    }
+
     // 获取书签数据
     async getBookmarks() {
+        const cacheKey = this.getCacheKey(this.config.endpoints.bookmarks);
+        const cachedData = this.getFromCache(cacheKey);
+        
+        if (cachedData) {
+            console.log('📦 使用缓存的书签数据');
+            return cachedData;
+        }
+        
         try {
             const response = await this.fetchWithRetry(this.config.endpoints.bookmarks);
             const data = await response.json();
@@ -154,9 +221,24 @@ class ApiService {
                 throw new Error(data.message || '获取数据失败');
             }
             
-            return data.data || [];
+            const bookmarks = data.data || [];
+            
+            // 缓存数据
+            this.setCache(cacheKey, bookmarks);
+            
+            return bookmarks;
         } catch (error) {
             console.error('获取书签数据失败:', error);
+            
+            // 增强错误信息
+            if (error.message.includes('Failed to fetch')) {
+                throw new Error('网络连接失败，请检查网络设置');
+            } else if (error.message.includes('timeout') || error.name === 'AbortError') {
+                throw new Error('请求超时，请检查网络连接');
+            } else if (error.message.includes('Notion')) {
+                throw new Error('Notion API 连接失败，请检查配置');
+            }
+            
             throw error;
         }
     }

@@ -38,6 +38,9 @@ class BookmarkApp {
             // 记录性能指标
             this.performanceMetrics.loadTime = performance.now() - this.performanceMetrics.startTime;
             
+            // 启动性能监控
+            this.startPerformanceMonitoring();
+            
         } catch (error) {
             console.error('❌ 应用初始化失败:', error);
             this.handleInitError(error);
@@ -101,7 +104,8 @@ class BookmarkApp {
             this.eventManager = new window.EventManager(
                 this.dataManager,
                 this.uiManager,
-                this.apiService
+                this.apiService,
+                this
             );
             
             // 初始化懒加载器
@@ -333,11 +337,70 @@ class BookmarkApp {
 
     // 获取性能指标
     getPerformanceMetrics() {
-        return {
+        const metrics = {
             ...this.performanceMetrics,
             isInitialized: this.isInitialized,
-            retryCount: this.retryCount
+            retryCount: this.retryCount,
+            memory: null,
+            network: null
         };
+        
+        // 获取内存使用情况（如果支持）
+        if (performance.memory) {
+            metrics.memory = {
+                used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
+                total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
+                limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024)
+            };
+        }
+        
+        // 获取网络信息（如果支持）
+        if (navigator.connection) {
+            metrics.network = {
+                effectiveType: navigator.connection.effectiveType,
+                downlink: navigator.connection.downlink,
+                rtt: navigator.connection.rtt
+            };
+        }
+        
+        return metrics;
+    }
+    
+    // 性能监控
+    startPerformanceMonitoring() {
+        // 监控长任务
+        if ('PerformanceObserver' in window) {
+            const observer = new PerformanceObserver((list) => {
+                for (const entry of list.getEntries()) {
+                    if (entry.duration > 50) { // 超过50ms的任务
+                        console.warn('检测到长任务:', {
+                            name: entry.name,
+                            duration: entry.duration,
+                            startTime: entry.startTime
+                        });
+                    }
+                }
+            });
+            
+            try {
+                observer.observe({ entryTypes: ['longtask'] });
+            } catch (e) {
+                console.warn('长任务监控不可用');
+            }
+        }
+        
+        // 监控内存使用
+        if (performance.memory) {
+            setInterval(() => {
+                const memory = performance.memory;
+                const usedMB = Math.round(memory.usedJSHeapSize / 1024 / 1024);
+                const totalMB = Math.round(memory.totalJSHeapSize / 1024 / 1024);
+                
+                if (usedMB > totalMB * 0.8) {
+                    console.warn('内存使用率过高:', `${usedMB}MB / ${totalMB}MB`);
+                }
+            }, 30000); // 每30秒检查一次
+        }
     }
 
     // 重新加载数据
@@ -350,15 +413,22 @@ class BookmarkApp {
         try {
             this.uiManager.showLoading(true);
             
+            // 重新加载书签数据
             const bookmarks = await this.loadBookmarks();
+            
+            // 更新数据管理器
             this.dataManager.setBookmarks(bookmarks);
+            
+            // 更新UI
             this.eventManager.updateUI();
             
-            this.uiManager.showMessage('数据刷新成功！', 'success');
+            console.log('✅ 数据刷新成功');
             
         } catch (error) {
-            console.error('数据刷新失败:', error);
-            this.uiManager.showMessage('数据刷新失败', 'error');
+            console.error('❌ 数据刷新失败:', error);
+            
+            // 重新抛出错误，让调用者处理
+            throw error;
         } finally {
             this.uiManager.showLoading(false);
         }
