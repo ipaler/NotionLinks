@@ -203,30 +203,49 @@ class ApiService {
         this.cacheTimestamps.clear();
     }
 
-    // 获取书签数据
-    async getBookmarks() {
-        const cacheKey = this.getCacheKey(this.config.endpoints.bookmarks);
-        const cachedData = this.getFromCache(cacheKey);
+    // 获取书签数据（支持分页和缓存）
+    async getBookmarks(options = {}) {
+        const {
+            page = 1,
+            limit = 50,
+            forceRefresh = false,
+            incremental = false
+        } = options;
         
-        if (cachedData) {
-            console.log('📦 使用缓存的书签数据');
-            return cachedData;
+        // 构建查询参数
+        const params = new URLSearchParams({
+            page: page.toString(),
+            limit: limit.toString(),
+            force_refresh: forceRefresh.toString(),
+            incremental: incremental.toString()
+        });
+        
+        const url = `${this.config.endpoints.bookmarks}?${params.toString()}`;
+        const cacheKey = this.getCacheKey(url);
+        
+        // 检查缓存（非强制刷新时）
+        if (!forceRefresh) {
+            const cachedData = this.getFromCache(cacheKey);
+            if (cachedData) {
+                console.log(`📦 使用缓存的书签数据 (页码: ${page})`);
+                return cachedData;
+            }
         }
         
         try {
-            const response = await this.fetchWithRetry(this.config.endpoints.bookmarks);
+            const response = await this.fetchWithRetry(url);
             const data = await response.json();
             
             if (!data.success) {
                 throw new Error(data.message || '获取数据失败');
             }
             
-            const bookmarks = data.data || [];
+            // 缓存数据（非缓存数据时）
+            if (!data.fromCache) {
+                this.setCache(cacheKey, data);
+            }
             
-            // 缓存数据
-            this.setCache(cacheKey, bookmarks);
-            
-            return bookmarks;
+            return data;
         } catch (error) {
             console.error('获取书签数据失败:', error);
             
@@ -237,8 +256,34 @@ class ApiService {
                 throw new Error('请求超时，请检查网络连接');
             } else if (error.message.includes('Notion')) {
                 throw new Error('Notion API 连接失败，请检查配置');
+            } else if (error.message.includes('频率超限')) {
+                throw new Error('请求过于频繁，请稍后重试');
+            } else if (error.message.includes('同步进行中')) {
+                throw new Error('数据同步进行中，请稍后重试');
             }
             
+            throw error;
+        }
+    }
+
+    // 清理缓存
+    async clearCache() {
+        try {
+            const response = await this.fetchWithRetry('/api/cache/clear', {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                // 清理本地缓存
+                this.cache.clear();
+                this.cacheTimestamps.clear();
+                console.log('🗑️ 缓存已清理');
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('清理缓存失败:', error);
             throw error;
         }
     }

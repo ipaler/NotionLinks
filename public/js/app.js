@@ -173,8 +173,24 @@ class BookmarkApp {
     // 加载书签数据
     async loadBookmarks() {
         try {
-            const bookmarks = await this.apiService.getBookmarks();
-            return bookmarks;
+            const result = await this.apiService.getBookmarks();
+            
+            // 处理新的API返回格式
+            if (result && typeof result === 'object') {
+                // 新格式：{ success: true, data: [...], count: 50, ... }
+                if (result.success && Array.isArray(result.data)) {
+                    return result.data;
+                }
+                // 兼容旧格式：直接返回数组
+                else if (Array.isArray(result)) {
+                    return result;
+                }
+            }
+            
+            // 如果格式不正确，返回空数组
+            console.warn('⚠️ 书签数据格式异常，返回空数组');
+            return [];
+            
         } catch (error) {
             console.error('❌ 书签数据加载失败:', error);
             throw error;

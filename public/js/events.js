@@ -889,7 +889,18 @@ class EventManager {
         
         try {
             // 执行刷新逻辑
-            const bookmarks = await this.apiService.getBookmarks();
+            const result = await this.apiService.getBookmarks({ forceRefresh: true });
+            
+            // 处理新的API返回格式
+            let bookmarks = [];
+            if (result && typeof result === 'object') {
+                if (result.success && Array.isArray(result.data)) {
+                    bookmarks = result.data;
+                } else if (Array.isArray(result)) {
+                    bookmarks = result;
+                }
+            }
+            
             this.dataManager.setBookmarks(bookmarks);
             this.updateUI();
             this.uiManager.showMessage('刷新成功！', 'success');
